@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Self, Tuple
+from typing import Any, Self
 
 import typer
 import yaml
@@ -9,28 +9,52 @@ from rich.console import Console
 app = typer.Typer()
 console = Console()
 
+# CLI Arguments
+INIT_PATH_ARG = typer.Argument(
+    default=Path("."),
+    help="Project path",
+    exists=True,
+    dir_okay=True,
+    file_okay=False,
+)
+
+COMPILE_CONFIG_ARG = typer.Argument(
+    ...,
+    help="Path to YAML config",
+    exists=True,
+    dir_okay=False,
+    file_okay=True,
+)
+
+COMPILE_OUTPUT_OPT = typer.Option(
+    None,
+    help="Output JSON path",
+    dir_okay=False,
+    file_okay=True,
+)
+
 
 # Base Models
 class FileRef(BaseModel):
-    description: Optional[str] = None
+    description: str | None = None
     path: str
 
 
 class Group(BaseModel):
     name: str
-    description: Optional[str] = None
-    system_prompt: Optional[str] = None
-    files: List[FileRef] = Field(default_factory=list)
-    symbols: List[FileRef] = Field(default_factory=list)
+    description: str | None = None
+    system_prompt: str | None = None
+    files: list[FileRef] = Field(default_factory=list)
+    symbols: list[FileRef] = Field(default_factory=list)
 
 
 class Workspace(BaseModel):
     name: str
     version: str = "0.1.0"
     workspace_spec: str = "1.0"
-    description: Optional[str] = None
-    system_prompt: Optional[str] = None
-    groups: List[Group] = Field(default_factory=list)
+    description: str | None = None
+    system_prompt: str | None = None
+    groups: list[Group] = Field(default_factory=list)
 
 
 # Template Models
@@ -38,8 +62,8 @@ class Template(BaseModel):
     name: str
     description: str
     content: str
-    variables: Dict[str, str] = Field(
-        default_factory=lambda _: dict[str, str]({"project_name": "Project name"})
+    variables: dict[str, str] = Field(
+        default_factory=lambda: {"project_name": "Project name"}
     )
 
     def render(self: Self, **kwargs: Any) -> Workspace:
@@ -50,17 +74,17 @@ class Template(BaseModel):
 
 
 class TemplateLibrary(BaseModel):
-    templates: Dict[str, Template] = Field(default_factory=dict)
+    templates: dict[str, Template] = Field(default_factory=dict)
 
-    def get(self, name: str) -> Optional[Template]:
+    def get(self, name: str) -> Template | None:
         return self.templates.get(name)
 
-    def list_templates(self) -> List[str]:
+    def list_templates(self) -> list[str]:
         return list(self.templates.keys())
 
 
 class FileContent(BaseModel):
-    description: Optional[str] = None
+    description: str | None = None
     path: str
     content: str
 
@@ -69,26 +93,51 @@ class DataFiles:
     CONVENTIONS = FileContent(
         path="CONVENTIONS.md",
         description="Project conventions and guidelines",
-        content="""# Project Conventions
+        content="""
+# Project Conventions
 
-## Overview
-This document outlines the key conventions and guidelines for this project.
+## Code Style
+- Use Python 3.13+ with strict type hints
+- Keep functions focused and minimal
+- Use descriptive names
+- Include language identifiers in code blocks
+- Only show relevant code sections (if not asked otherwise)
 
-## Structure
-- `.cc/` - CodeCompanion workspace files
-  - `data/` - Additional documentation and resources
-  - `codecompanion.yaml` - Workspace configuration
-- `codecompanion-workspace.json` - Compiled workspace configuration
+## Package Management
+- Use `uv` for all package operations
+- Add runtime deps: `uv add <package>`
+- Add dev deps: `uv add --dev <package>`
+- Don't use pip or "uv pip" directly
+- Your own workspace is in ./.cc/ directory
 
-## Guidelines
-1. Keep documentation up to date
-2. Follow the project's coding standards
-3. Update this file as conventions evolve
-""",
+## Response Format
+- Use Markdown with language identifiers in code blocks
+- Keep responses concise
+- Write brief step-by-step plans when needed
+
+## Code Architecture
+- Prefer data-centric design over heavy OOP
+- Use Pydantic for strict data validation
+- Keep business logic procedural and concentrated
+- Minimize abstractions and inheritance
+- Design clever, precise functions over complex class hierarchies
+
+## Technology Stack
+- Use modern, type-safe packages:
+  - Litestar for APIs (preferred over FastAPI)
+  - Pydantic for data validation
+  - Pydantic-settings for configuration
+  - Typer for CLIs
+  - Rich/Textual for advanced TUI
+  - Prompt-toolkit for simple CLI interactions or advanced keybindings (vim, emacs)
+- Choose packages thoughtfully based on actual needs
+- When introducing new package, provide `uv add` command for user
+
+""".strip(),
     )
 
 
-def ensure_cc_structure(path: Path) -> Tuple[Path, Path]:
+def ensure_cc_structure(path: Path) -> tuple[Path, Path]:
     """Create .cc directory structure"""
     cc_dir = path / ".cc"
     data_dir = cc_dir / "data"
@@ -99,7 +148,7 @@ def ensure_cc_structure(path: Path) -> Tuple[Path, Path]:
     # Create default files
     conventions_path = data_dir / DataFiles.CONVENTIONS.path
     if not conventions_path.exists():
-        with open(conventions_path, 'w') as f:
+        with open(conventions_path, "w") as f:
             f.write(DataFiles.CONVENTIONS.content)
 
     return cc_dir, data_dir
@@ -114,31 +163,32 @@ TEMPLATES = TemplateLibrary(
 name: "{project_name}"
 version: "0.1.0"
 workspace_spec: "1.0"
-description: "CodeCompanion workspace demonstrating key features"
-system_prompt: '''
-You are a development assistant for the {project_name} project.
-Please follow the conventions in .cc/data/CONVENTIONS.md.
-'''
+description: "CodeCompanion workspace tool for managing project context"
+system_prompt: |-
+  You are a professional Python developer focused on building
+  the cc_workspace CLI tool.
+  You prefer writing code over lengthy explanations and value clean,
+  efficient solutions.
+  Your main task is improving and extending the workspace
+  configuration system for CodeCompanion.nvim.
+
+  You are currently integrated with Neovim and have access to the project's source code.
+  You understand modern Python development practices and tooling.
 groups:
-  - name: "Documentation"
-    description: "Project documentation and conventions"
+  - name: "Dev"
+    description: "Development workspace with core files and documentation"
     files:
       - path: ".cc/data/CONVENTIONS.md"
         description: "Project conventions and guidelines"
-      - path: "README.md"
-        description: "Project overview and setup instructions"
-
-  - name: "Source"
-    description: "Main source code"
-    files: []
-    symbols: []
-
-  - name: "Tests"
-    description: "Test suite"
-    files: []
-    symbols: []
+      - path: "cc_workspace/main.py"
+        description: "Main CLI implementation"
+      - path: "pyproject.toml"
+        description: "Project configuration"
+    symbols:
+      - path: "cc_workspace/main.py"
+        description: "Main CLI implementation"
 """,
-        )
+        ),
     }
 )
 
@@ -150,19 +200,18 @@ def ensure_cc_dir(path: Path) -> Path:
     return cc_dir
 
 
-def create_workspace(
-    path: Path, template_name: Optional[str] = None
-) -> Tuple[Path, Path]:
+def create_workspace(path: Path, template_name: str | None = None) -> tuple[Path, Path]:
     """Create a new workspace and return paths to yaml config and cc dir"""
-    cc_dir, data_dir = ensure_cc_structure(path)
+    cc_dir, _ = ensure_cc_structure(path)
     config_path = cc_dir / "codecompanion.yaml"
     project_name = path.absolute().name
 
     # Get and validate template
     template = TEMPLATES.get(template_name or "default")
     if not template:
+        available = TEMPLATES.list_templates()
         raise ValueError(
-            f"Template '{template_name}' not found. Available templates: {', '.join(TEMPLATES.list_templates())}"
+            f"Template '{template_name}' not found. Available: {available}"
         )
 
     # Render template and validate
@@ -175,7 +224,7 @@ def create_workspace(
     return config_path, cc_dir
 
 
-def compile_workspace(config_path: Path, output_path: Optional[Path] = None) -> None:
+def compile_workspace(config_path: Path, output_path: Path | None = None) -> None:
     """Compile YAML to JSON"""
     if not output_path:
         output_path = config_path.parent.parent / "codecompanion-workspace.json"
@@ -192,13 +241,7 @@ def compile_workspace(config_path: Path, output_path: Optional[Path] = None) -> 
 
 @app.command()
 def init(
-    path: Path = typer.Argument(
-        default=Path("."),
-        help="Project path",
-        exists=True,
-        dir_okay=True,
-        file_okay=False,
-    ),
+    path: Path = INIT_PATH_ARG,
     template: str = typer.Option(
         None,
         help=f"Template to use: {', '.join(TEMPLATES.list_templates())}",
@@ -218,34 +261,45 @@ def init(
             compile_workspace(config_path)
             console.print("✨ Compiled workspace config")
     except Exception as e:
-        console.print(f"[red]Error: {str(e)}[/red]")
-        raise typer.Exit(1)
+        console.print(f"[red]Error: {e!s}[/red]")
+        raise typer.Exit(1) from e
 
 
 @app.command()
-def compile(
-    config: Path = typer.Argument(
-        ...,
-        help="Path to YAML config",
-        exists=True,
-        dir_okay=False,
-        file_okay=True,
-    ),
-    output: Optional[Path] = typer.Option(
-        None,
-        help="Output JSON path",
-        dir_okay=False,
-        file_okay=True,
-    ),
+def compile_config(
+    config: Path = COMPILE_CONFIG_ARG,
+    output: Path | None = COMPILE_OUTPUT_OPT,
 ) -> None:
     """Compile YAML config to CodeCompanion workspace JSON"""
     try:
         compile_workspace(config, output)
         console.print("✨ Compiled workspace config")
     except Exception as e:
-        console.print(f"[red]Error: {str(e)}[/red]")
-        raise typer.Exit(1)
+        console.print(f"[red]Error: {e!s}[/red]")
+        raise typer.Exit(1) from e
 
 
 if __name__ == "__main__":
     app()
+
+
+# TODO: [see below]
+
+# 1. Tests:
+# - Add test for `uv` package management in `setup_dev_workspace.sh`
+# - Test workspace file validation (invalid YAML structure, missing required fields)
+# - Test template variables substitution
+
+# 2. Features:
+# - Add workspace validation command (`ccw validate`)
+# - Add template list command (`ccw templates list`)
+# - Add template creation command (`ccw templates new`)
+# - Support URLs in workspace files (like CodeCompanion.nvim does)
+
+# 3. Code improvements:
+# - Move templates to separate YAML files
+# - Add proper error messages for workspace validation
+# - Add workspace schema version validation
+
+# The most important next step is workspace validation
+# since it will help catch configuration errors early.

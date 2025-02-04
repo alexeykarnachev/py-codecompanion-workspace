@@ -2,12 +2,12 @@
   "name": "cc-workspace",
   "version": "0.1.0",
   "workspace_spec": "1.0",
-  "description": "CodeCompanion workspace demonstrating key features",
-  "system_prompt": "' You are a development assistant for the cc-workspace project. Please follow the conventions in .cc/data/CONVENTIONS.md. '",
+  "description": "CodeCompanion workspace tool for managing project context",
+  "system_prompt": "You are a professional Python developer focused on building\nthe cc_workspace CLI tool.\nYou prefer writing code over lengthy explanations and value clean,\nefficient solutions.\nYour main task is improving and extending the workspace\nconfiguration system for CodeCompanion.nvim.\n\nYou are currently integrated with Neovim and have access to the project's source code.\nYou understand modern Python development practices and tooling.",
   "groups": [
     {
-      "name": "Documentation",
-      "description": "Project documentation and conventions",
+      "name": "Dev",
+      "description": "Development workspace with core files and documentation",
       "system_prompt": null,
       "files": [
         {
@@ -15,25 +15,20 @@
           "path": ".cc/data/CONVENTIONS.md"
         },
         {
-          "description": "Project overview and setup instructions",
-          "path": "README.md"
+          "description": "Main CLI implementation",
+          "path": "cc_workspace/main.py"
+        },
+        {
+          "description": "Project configuration",
+          "path": "pyproject.toml"
         }
       ],
-      "symbols": []
-    },
-    {
-      "name": "Source",
-      "description": "Main source code",
-      "system_prompt": null,
-      "files": [],
-      "symbols": []
-    },
-    {
-      "name": "Tests",
-      "description": "Test suite",
-      "system_prompt": null,
-      "files": [],
-      "symbols": []
+      "symbols": [
+        {
+          "description": "Main CLI implementation",
+          "path": "cc_workspace/main.py"
+        }
+      ]
     }
   ]
 }

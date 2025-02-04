@@ -14,13 +14,15 @@ def test_init_command(tmp_path: Path) -> None:
     assert (tmp_path / ".cc" / "codecompanion.yaml").exists()
 
 
-def test_compile_command(tmp_path: Path) -> None:
+def test_compile_config_command(tmp_path: Path) -> None:
+    """Test the compile-config command workflow"""
     # First init
-    runner.invoke(app, ["init", str(tmp_path)])
+    init_result = runner.invoke(app, ["init", str(tmp_path)])
+    assert init_result.exit_code == 0
 
-    # Then compile
+    # Then compile config
     yaml_path = tmp_path / ".cc" / "codecompanion.yaml"
-    result = runner.invoke(app, ["compile", str(yaml_path)])
+    result = runner.invoke(app, ["compile-config", str(yaml_path)])
     assert result.exit_code == 0
     assert "✨ Compiled workspace config" in result.stdout
     assert (tmp_path / "codecompanion-workspace.json").exists()

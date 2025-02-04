@@ -11,18 +11,31 @@ repos:
     rev: 5.13.2
     hooks:
     -   id: isort
+        args: ["cc_workspace/", "tests/", "scripts/"]
 
 -   repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.3.0
     hooks:
     -   id: ruff
-        args: [--fix]
+        args:
+        - --fix
+        - --select=F,E,W,I,N,UP,B,A,C4,SIM,ERA,PL,RUF,F841
+        - cc_workspace/
+        - tests/
+        - scripts/
 
 -   repo: local
     hooks:
-    -   id: check-script
-        name: Run all checks
+    -   id: lint-check
+        name: Run linting checks
+        entry: bash scripts/lint.sh
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+    -   id: full-check
+        name: Run full checks with tests
         entry: bash scripts/check.sh
         language: system
         pass_filenames: false
-        always_run: true
+        stages: [pre-push]

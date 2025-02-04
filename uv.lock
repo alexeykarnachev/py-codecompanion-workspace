@@ -15,15 +15,21 @@ name = "cc-workspace"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "mypy" },
     { name = "pathspec" },
     { name = "pydantic" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
     { name = "pyyaml" },
     { name = "rich" },
+    { name = "ruff" },
     { name = "typer" },
+    { name = "types-pyyaml" },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "cc-workspace" },
     { name = "isort" },
     { name = "mypy" },
     { name = "pre-commit" },
@@ -35,15 +41,21 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "mypy", specifier = ">=1.14.1" },
     { name = "pathspec", specifier = ">=0.12.1" },
     { name = "pydantic", specifier = ">=2.10.6" },
+    { name = "pytest", specifier = ">=8.3.4" },
+    { name = "pytest-cov", specifier = ">=6.0.0" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "rich", specifier = ">=13.9.4" },
+    { name = "ruff", specifier = ">=0.9.4" },
     { name = "typer", specifier = ">=0.15.1" },
+    { name = "types-pyyaml", specifier = ">=6.0.12.20241230" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "cc-workspace", editable = "." },
     { name = "isort", specifier = ">=6.0.0" },
     { name = "mypy", specifier = ">=1.14.1" },
     { name = "pre-commit", specifier = ">=4.1.0" },

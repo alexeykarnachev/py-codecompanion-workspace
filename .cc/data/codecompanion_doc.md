@@ -1,7 +1,21 @@
 # CodeCompanion.nvim Complete Documentation
 
+
+
+
+# Welcome to CodeCompanion.nvim
+
+> AI-powered coding, seamlessly in _Neovim_
+
+CodeCompanion is a productivity tool which streamlines how you develop with LLMs, in Neovim.
+
+<p>
+<video controls muted src="https://github.com/user-attachments/assets/aa109f1d-0ec9-4f08-bd9a-df99da03b9a4"></video>
+</p>
+
 ## Features
 
+- :speech_balloon: [Copilot Chat](https://github.com/features/copilot) meets [Zed AI](https://zed.dev/blog/zed-ai), in Neovim
 - :electric_plug: Support for Anthropic, Copilot, DeepSeek, Gemini, Ollama, OpenAI, Azure OpenAI, HuggingFace and xAI LLMs (or bring your own!)
 - :rocket: Inline transformations, code creation and refactoring
 - :robot: Variables, Slash Commands, Agents/Tools and Workflows to improve LLM output

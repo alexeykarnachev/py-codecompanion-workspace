@@ -7,11 +7,16 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "mypy>=1.14.1",
     "pathspec>=0.12.1",
     "pydantic>=2.10.6",
+    "pytest>=8.3.4",
+    "pytest-cov>=6.0.0",
     "pyyaml>=6.0.2",
     "rich>=13.9.4",
+    "ruff>=0.9.4",
     "typer>=0.15.1",
+    "types-pyyaml>=6.0.12.20241230",
 ]
 
 [build-system]
@@ -20,6 +25,7 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "cc-workspace",
     "isort>=6.0.0",
     "mypy>=1.14.1",
     "pre-commit>=4.1.0",
@@ -30,4 +36,48 @@ dev = [
 ]
 
 [project.scripts]
-ccw = "cc_workspace.cli:main"
+ccw = "cc_workspace.main:app"
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+dummy-variable-rgx = "^_$"
+select = [
+    "F",    # Pyflakes
+    "E",    # pycodestyle
+    "W",    # pycodestyle
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "A",    # flake8-builtins
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "ERA",  # eradicate
+    "PL",   # Pylint
+    "RUF",  # Ruff-specific rules
+    "ARG",  # flake8-unused-arguments
+    "F504", # Unused variable from tuple assignment
+    "F841", # Unused variable
+]
+ignore = []
+
+[tool.ruff.lint.pycodestyle]
+ignore-overlong-task-comments = true
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.isort]
+known-first-party = ["cc_workspace"]
+
+[tool.ruff.lint.flake8-unused-arguments]
+ignore-variadic-names = true
+
+[tool.uv.sources]
+cc-workspace = { workspace = true }
