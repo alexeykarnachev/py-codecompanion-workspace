@@ -1,0 +1,26 @@
+name: cc-workspace
+version: 0.1.0
+workspace_spec: '1.0'
+description: CodeCompanion workspace demonstrating key features
+system_prompt: ''' You are a development assistant for the cc-workspace project. Please
+  follow the conventions in .cc/data/CONVENTIONS.md. '''
+groups:
+- name: Documentation
+  description: Project documentation and conventions
+  system_prompt: null
+  files:
+  - description: Project conventions and guidelines
+    path: .cc/data/CONVENTIONS.md
+  - description: Project overview and setup instructions
+    path: README.md
+  symbols: []
+- name: Source
+  description: Main source code
+  system_prompt: null
+  files: []
+  symbols: []
+- name: Tests
+  description: Test suite
+  system_prompt: null
+  files: []
+  symbols: []
