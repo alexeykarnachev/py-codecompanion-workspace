@@ -9,7 +9,7 @@ uv add --dev .
 uv add pytest pytest-cov ruff mypy types-pyyaml
 
 echo "🚀 Initializing workspace..."
-python -m cc_workspace init . --template _ccw_dev
+python -m cc_workspace init . --template dev
 
 echo "🔍 Running quality checks..."
 ./scripts/quality.sh

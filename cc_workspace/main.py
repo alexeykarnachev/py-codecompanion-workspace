@@ -1,6 +1,8 @@
+import fnmatch
 import importlib.resources
+import json
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, Literal
 
 import typer
 import yaml
@@ -36,53 +38,125 @@ COMPILE_OUTPUT_OPT = typer.Option(
 )
 
 
-# Base Models
-class FileRef(BaseModel):
+class File(BaseModel):
     description: str | None = None
     path: str
+    kind: Literal["file", "pattern"] = "file"
 
+    IGNORE_PATTERNS: ClassVar[set[str]] = {
+        # Dependencies
+        "node_modules/",
+        "venv/",
+        ".env/",
+        "__pycache__/",
+        "*.pyc",
+        "target/",
+        "dist/",
+        "build/",
+        # IDE and editor files
+        "*.swp",
+        ".DS_Store",
+        # Logs and temporary files
+        "*.log",
+        "tmp/",
+        "temp/",
+        # Package files
+        "*.egg-info/",
+        "*.egg",
+        # CodeCompanion workspace files
+        ".cc/",
+    }
 
-class FilePattern(BaseModel):
-    pattern: str
-    description: str | None = None
+    def should_ignore(self, path: str) -> bool:
+        """Check if path matches any ignore pattern"""
+        # Normalize path
+        path = str(path)
+        if path.startswith("./"):
+            path = path[2:]
+
+        # Check for dot directories in path parts
+        path_parts = Path(path).parts
+        if any(part.startswith(".") for part in path_parts):
+            return True
+
+        # For patterns, check other ignore rules
+        if self.kind == "pattern":
+            return any(
+                fnmatch.fnmatch(path, pattern) if "*" in pattern else pattern in path
+                for pattern in self.IGNORE_PATTERNS
+            )
+
+        return False
+
+    def resolve(self, base_path: Path) -> list["File"]:
+        """Resolve pattern into actual files"""
+        if self.kind == "pattern":
+            resolved = []
+            try:
+                # Handle different glob patterns
+                if "**" in self.path:
+                    paths = base_path.rglob(self.path.replace("**/", ""))
+                else:
+                    paths = base_path.glob(self.path)
+
+                # Process found paths
+                for path in sorted(paths):
+                    if not path.is_file():
+                        continue
+
+                    rel_path = str(path.relative_to(base_path))
+
+                    # Skip empty files
+                    if path.stat().st_size == 0:
+                        continue
+
+                    # Skip ignored paths
+                    if self.should_ignore(rel_path):
+                        continue
+
+                    resolved.append(
+                        File(
+                            path=rel_path,
+                            description=self.description,
+                            kind="file",
+                        )
+                    )
+            except Exception as e:
+                print(f"Error resolving pattern {self.path}: {e}")
+                return []
+
+            return resolved
+        else:
+            # For explicit files, check if they should be ignored
+            path = base_path / self.path
+            if path.is_file() and path.stat().st_size > 0:
+                rel_path = str(path.relative_to(base_path))
+                if self.should_ignore(rel_path):
+                    return []
+                return [self]
+            return []
 
 
 class Group(BaseModel):
     name: str
     description: str | None = None
     system_prompt: str = ""
-    files: list[FileRef | FilePattern] = Field(default_factory=list)
-    resolved_files: list[FileRef] | None = Field(default=None, exclude=True)
-    symbols: list[FileRef] = Field(default_factory=list)
+    files: list[File] = Field(default_factory=list)
+    symbols: list[File] = Field(default_factory=list)
 
-    def get_files(self) -> list[FileRef]:
-        """Get resolved files, resolving patterns if needed"""
-        if self.resolved_files is None:
-            raise ValueError("Files not resolved. Call resolve_patterns() first")
-        return self.resolved_files
+    def resolve_patterns(self, base_path: Path) -> dict[str, Any]:
+        """Resolve file patterns into actual files"""
+        data = self.model_dump()
 
-    def resolve_patterns(self, base_path: Path) -> None:
-        """Resolve glob patterns to actual files"""
-        resolved: list[FileRef] = []
+        # Resolve patterns to actual files
+        resolved_files = []
+        for file in self.files:
+            resolved_files.extend(file.resolve(base_path))
+        data["files"] = [
+            {"path": f.path, "description": f.description} for f in resolved_files
+        ]
 
-        for spec in self.files:
-            if isinstance(spec, FilePattern):
-                # Handle glob pattern
-                for path in sorted(base_path.glob(spec.pattern)):
-                    if path.is_file():
-                        desc = (
-                            spec.description or f"{path.stem.replace('_', ' ').title()}"
-                        )
-                        resolved.append(
-                            FileRef(
-                                path=str(path.relative_to(base_path)), description=desc
-                            )
-                        )
-            else:
-                # Handle explicit FileRef
-                resolved.append(spec)
-
-        self.resolved_files = resolved
+        return data
 
 
 class Workspace(BaseModel):
@@ -90,6 +164,12 @@ class Workspace(BaseModel):
     description: str | None = None
     system_prompt: str = ""
     groups: list[Group] = Field(default_factory=list)
+
+    def resolve_patterns(self, base_path: Path) -> dict[str, Any]:
+        """Resolve patterns in all groups"""
+        data = self.model_dump()
+        data["groups"] = [g.resolve_patterns(base_path) for g in self.groups]
+        return data
 
 
 class Template(BaseModel):
@@ -205,7 +285,7 @@ def create_workspace(path: Path, template_name: str | None = None) -> tuple[Path
 
     # Write to file
     with open(config_path, "w") as f:
-        yaml.dump(workspace.model_dump(), f, sort_keys=False)
+        yaml.dump(workspace.resolve_patterns(base_path=path), f, sort_keys=False)
 
     return config_path, cc_dir
 
@@ -214,13 +294,12 @@ def validate_workspace_files(workspace: Workspace, base_path: Path) -> list[str]
     """Validate all files in workspace exist"""
     errors = []
 
-    # First resolve all patterns
     for group in workspace.groups:
-        group.resolve_patterns(base_path)
+        for file in group.files:
+            # Skip validation for glob patterns
+            if any(char in file.path for char in "*?[]"):
+                continue
 
-    # Then validate resolved files
-    for group in workspace.groups:
-        for file in group.get_files():
             path = base_path / file.path
             if not path.exists():
                 errors.append(f"File not found: {file.path}")
@@ -237,6 +316,8 @@ def compile_workspace(config_path: Path, output_path: Path | None = None) -> Non
     """Compile YAML to JSON"""
     if not output_path:
         output_path = config_path.parent.parent / "codecompanion-workspace.json"
+
+    base_path = config_path.parent.parent
 
     with Progress(
         SpinnerColumn(),
@@ -257,10 +338,11 @@ def compile_workspace(config_path: Path, output_path: Path | None = None) -> Non
         if errors:
             raise ValueError("\n".join(["Invalid workspace:", *errors]))
 
-        # Write JSON
+        # Write JSON with resolved patterns
         progress.add_task("Writing output...", total=None)
         with open(output_path, "w") as f:
-            f.write(workspace.model_dump_json(indent=2))
+            data = workspace.resolve_patterns(base_path=base_path)
+            f.write(json.dumps(data, indent=2))
 
 
 @app.command()
@@ -277,6 +359,16 @@ def init(
 ) -> None:
     """Initialize a new CodeCompanion workspace"""
     try:
+        # Debug output
+        console.print(f"Available templates: {TEMPLATES.list_templates()}")
+        if template:
+            console.print(f"Selected template: {template}")
+            tmpl = TEMPLATES.get(template)
+            if tmpl:
+                console.print(
+                    f"Template content: {tmpl.content[:100]}..."
+                )  # First 100 chars
+
         config_path, cc_dir = create_workspace(path, template)
         console.print(f"✨ Initialized workspace at {path}")
         console.print(f"📁 CCW files stored in {cc_dir}")

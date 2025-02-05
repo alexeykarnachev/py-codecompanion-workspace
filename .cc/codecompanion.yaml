@@ -2,56 +2,105 @@ name: cc-workspace
 description: Development workspace for cc-workspace
 system_prompt: ''
 groups:
-- name: Core
-  description: Core package files
+- name: All
+  description: All project files
   system_prompt: ''
   files:
-  - description: Package entry point
-    path: cc_workspace/__main__.py
-  - description: Main CLI implementation
-    path: cc_workspace/main.py
+  - path: README.md
+    description: Project file
+  - path: cc_workspace/__main__.py
+    description: Project file
+  - path: cc_workspace/data/CONVENTIONS.md
+    description: Project file
+  - path: cc_workspace/data/codecompanion_doc.md
+    description: Project file
+  - path: cc_workspace/data/templates/_ccw_dev.yaml
+    description: Project file
+  - path: cc_workspace/data/templates/default.yaml
+    description: Project file
+  - path: cc_workspace/data/templates/dev.yaml
+    description: Project file
+  - path: cc_workspace/main.py
+    description: Project file
+  - path: pyproject.toml
+    description: Project file
+  - path: scripts/bootstrap.sh
+    description: Project file
+  - path: scripts/merge_docs.py
+    description: Project file
+  - path: scripts/quality.sh
+    description: Project file
+  - path: scripts/verify.sh
+    description: Project file
+  - path: tests/test_integration.py
+    description: Project file
+  - path: tests/test_main.py
+    description: Project file
+  - path: uv.lock
+    description: Project file
   symbols: []
-- name: Package Data
-  description: Package data files
+- name: Source
+  description: Source code files
   system_prompt: ''
   files:
-  - description: Default workspace template
-    path: cc_workspace/data/templates/default.yaml
-  - description: Development workspace template
-    path: cc_workspace/data/templates/_ccw_dev.yaml
-  - description: CodeCompanion detailed documentation
-    path: cc_workspace/data/codecompanion_doc.md
-  - description: Project conventions and guidelines
-    path: cc_workspace/data/CONVENTIONS.md
+  - path: cc_workspace/__main__.py
+    description: Python file
+  - path: cc_workspace/main.py
+    description: Python file
+  - path: scripts/merge_docs.py
+    description: Python file
+  - path: tests/test_integration.py
+    description: Python file
+  - path: tests/test_main.py
+    description: Python file
+  symbols: []
+- name: Documentation
+  description: Documentation files
+  system_prompt: ''
+  files:
+  - path: README.md
+    description: Markdown file
+  - path: cc_workspace/data/CONVENTIONS.md
+    description: Markdown file
+  - path: cc_workspace/data/codecompanion_doc.md
+    description: Markdown file
   symbols: []
 - name: Tests
-  description: Test suite
+  description: Test files
   system_prompt: ''
   files:
-  - description: Integration tests
-    path: tests/test_integration.py
-  - description: Unit tests for main module
-    path: tests/test_main.py
+  - path: tests/test_integration.py
+    description: Test file
+  - path: tests/test_main.py
+    description: Test file
+  - path: tests/test_integration.py
+    description: Python test
+  - path: tests/test_main.py
+    description: Python test
   symbols: []
 - name: Scripts
-  description: Development and CI scripts
+  description: Build and utility scripts
   system_prompt: ''
   files:
-  - description: Development workspace setup
-    path: scripts/bootstrap.sh
-  - description: Code quality checks
-    path: scripts/quality.sh
-  - description: Full verification suite
-    path: scripts/verify.sh
+  - path: scripts/bootstrap.sh
+    description: Script file
+  - path: scripts/merge_docs.py
+    description: Script file
+  - path: scripts/quality.sh
+    description: Script file
+  - path: scripts/verify.sh
+    description: Script file
   symbols: []
 - name: Config
-  description: Project configuration files
+  description: Configuration files
   system_prompt: ''
   files:
-  - description: Project metadata and tool configuration
-    path: pyproject.toml
-  - description: Pre-commit hooks configuration
-    path: .pre-commit-config.yaml
-  - description: Project documentation
-    path: README.md
+  - path: pyproject.toml
+    description: TOML config
+  - path: cc_workspace/data/templates/_ccw_dev.yaml
+    description: YAML config
+  - path: cc_workspace/data/templates/default.yaml
+    description: YAML config
+  - path: cc_workspace/data/templates/dev.yaml
+    description: YAML config
   symbols: []
