@@ -1,3 +1,4 @@
+import importlib.resources
 from pathlib import Path
 from typing import Any, Self
 
@@ -5,6 +6,7 @@ import typer
 import yaml
 from pydantic import BaseModel, Field
 from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
 app = typer.Typer()
 console = Console()
@@ -50,8 +52,6 @@ class Group(BaseModel):
 
 class Workspace(BaseModel):
     name: str
-    version: str = "0.1.0"
-    workspace_spec: str = "1.0"
     description: str | None = None
     system_prompt: str | None = None
     groups: list[Group] = Field(default_factory=list)
@@ -96,6 +96,19 @@ class DataFiles:
         content="""
 # Project Conventions
 
+## Task Approach
+- Stay focused on the immediate task
+- Minimize scope creep and over-engineering
+- For small tasks (1-20 LOC):
+  - Implement directly when requirements are clear
+  - Provide solution in a single response
+- For larger tasks:
+  - First discuss the approach
+  - Request necessary documentation/files
+  - Break down into smaller steps
+  - Proceed only after approval
+- Additional improvements can be suggested separately after task completion
+
 ## Code Style
 - Use Python 3.13+ with strict type hints
 - Keep functions focused and minimal
@@ -135,6 +148,13 @@ class DataFiles:
 
 """.strip(),
     )
+    CODECOMPANION_DOC = FileContent(
+        path="codecompanion_doc.md",
+        description="CodeCompanion documentation",
+        content=importlib.resources.files("cc_workspace.data")
+        .joinpath("codecompanion_doc.md")
+        .read_text(),
+    )
 
 
 def ensure_cc_structure(path: Path) -> tuple[Path, Path]:
@@ -146,10 +166,11 @@ def ensure_cc_structure(path: Path) -> tuple[Path, Path]:
     data_dir.mkdir(exist_ok=True)
 
     # Create default files
-    conventions_path = data_dir / DataFiles.CONVENTIONS.path
-    if not conventions_path.exists():
-        with open(conventions_path, "w") as f:
-            f.write(DataFiles.CONVENTIONS.content)
+    for file in [DataFiles.CONVENTIONS, DataFiles.CODECOMPANION_DOC]:
+        file_path = data_dir / file.path
+        if not file_path.exists():
+            with open(file_path, "w") as f:
+                f.write(file.content)
 
     return cc_dir, data_dir
 
@@ -158,35 +179,16 @@ TEMPLATES = TemplateLibrary(
     templates={
         "default": Template(
             name="default",
-            description="Feature-complete minimal template",
+            description="Basic template for any project",
             content="""
 name: "{project_name}"
-version: "0.1.0"
-workspace_spec: "1.0"
-description: "CodeCompanion workspace tool for managing project context"
-system_prompt: |-
-  You are a professional Python developer focused on building
-  the cc_workspace CLI tool.
-  You prefer writing code over lengthy explanations and value clean,
-  efficient solutions.
-  Your main task is improving and extending the workspace
-  configuration system for CodeCompanion.nvim.
-
-  You are currently integrated with Neovim and have access to the project's source code.
-  You understand modern Python development practices and tooling.
+description: "CodeCompanion workspace for {project_name}"
 groups:
-  - name: "Dev"
-    description: "Development workspace with core files and documentation"
+  - name: "Main"
+    description: "Project files"
     files:
       - path: ".cc/data/CONVENTIONS.md"
         description: "Project conventions and guidelines"
-      - path: "cc_workspace/main.py"
-        description: "Main CLI implementation"
-      - path: "pyproject.toml"
-        description: "Project configuration"
-    symbols:
-      - path: "cc_workspace/main.py"
-        description: "Main CLI implementation"
 """,
         ),
     }
@@ -224,19 +226,52 @@ def create_workspace(path: Path, template_name: str | None = None) -> tuple[Path
     return config_path, cc_dir
 
 
+def validate_workspace_files(workspace: Workspace, base_path: Path) -> list[str]:
+    """Validate all files in workspace exist"""
+    errors = []
+
+    for group in workspace.groups:
+        for file in group.files:
+            path = base_path / file.path
+            if not path.exists():
+                errors.append(f"File not found: {file.path}")
+
+        for symbol in group.symbols:
+            path = base_path / symbol.path
+            if not path.exists():
+                errors.append(f"Symbol file not found: {symbol.path}")
+
+    return errors
+
+
 def compile_workspace(config_path: Path, output_path: Path | None = None) -> None:
     """Compile YAML to JSON"""
     if not output_path:
         output_path = config_path.parent.parent / "codecompanion-workspace.json"
 
-    # Read and validate YAML
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
-    workspace = Workspace(**config)
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        # Read and validate YAML
+        progress.add_task("Reading config...", total=None)
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
 
-    # Write JSON
-    with open(output_path, "w") as f:
-        f.write(workspace.model_dump_json(indent=2))
+        progress.add_task("Validating schema...", total=None)
+        workspace = Workspace(**config)
+
+        # Validate files exist
+        progress.add_task("Checking files...", total=None)
+        errors = validate_workspace_files(workspace, config_path.parent.parent)
+        if errors:
+            raise ValueError("\n".join(["Invalid workspace:", *errors]))
+
+        # Write JSON
+        progress.add_task("Writing output...", total=None)
+        with open(output_path, "w") as f:
+            f.write(workspace.model_dump_json(indent=2))
 
 
 @app.command()

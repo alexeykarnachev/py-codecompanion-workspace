@@ -1,35 +1,11 @@
 name: cc-workspace
-version: 0.1.0
-workspace_spec: '1.0'
-description: CodeCompanion workspace tool for managing project context
-system_prompt: 'You are a professional Python developer focused on building
-
-  the cc_workspace CLI tool.
-
-  You prefer writing code over lengthy explanations and value clean,
-
-  efficient solutions.
-
-  Your main task is improving and extending the workspace
-
-  configuration system for CodeCompanion.nvim.
-
-
-  You are currently integrated with Neovim and have access to the project''s source
-  code.
-
-  You understand modern Python development practices and tooling.'
+description: CodeCompanion workspace for cc-workspace
+system_prompt: null
 groups:
-- name: Dev
-  description: Development workspace with core files and documentation
+- name: Main
+  description: Project files
   system_prompt: null
   files:
   - description: Project conventions and guidelines
     path: .cc/data/CONVENTIONS.md
-  - description: Main CLI implementation
-    path: cc_workspace/main.py
-  - description: Project configuration
-    path: pyproject.toml
-  symbols:
-  - description: Main CLI implementation
-    path: cc_workspace/main.py
+  symbols: []

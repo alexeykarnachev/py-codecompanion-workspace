@@ -1,5 +1,18 @@
 # Project Conventions
 
+## Task Approach
+- Stay focused on the immediate task
+- Minimize scope creep and over-engineering
+- For small tasks (1-20 LOC):
+  - Implement directly when requirements are clear
+  - Provide solution in a single response
+- For larger tasks:
+  - First discuss the approach
+  - Request necessary documentation/files
+  - Break down into smaller steps
+  - Proceed only after approval
+- Additional improvements can be suggested separately after task completion
+
 ## Code Style
 - Use Python 3.13+ with strict type hints
 - Keep functions focused and minimal

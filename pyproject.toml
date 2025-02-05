@@ -23,6 +23,12 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build]
+include = [
+    "cc_workspace/**/*.py",
+    "cc_workspace/**/*.md",
+]
+
 [dependency-groups]
 dev = [
     "cc-workspace",
@@ -81,3 +87,4 @@ ignore-variadic-names = true
 
 [tool.uv.sources]
 cc-workspace = { workspace = true }
+
