@@ -1,0 +1,50 @@
+name: "{project_name}"
+description: "Development workspace for {project_name}"
+groups:
+  - name: "Core"
+    description: "Core package files"
+    files:
+      - path: "cc_workspace/__main__.py"
+        description: "Package entry point"
+      - path: "cc_workspace/main.py"
+        description: "Main CLI implementation"
+
+  - name: "Package Data"
+    description: "Package data files"
+    files:
+      - path: "cc_workspace/data/templates/default.yaml"
+        description: "Default workspace template"
+      - path: "cc_workspace/data/templates/_ccw_dev.yaml"
+        description: "Development workspace template"
+      - path: "cc_workspace/data/codecompanion_doc.md"
+        description: "CodeCompanion detailed documentation"
+      - path: "cc_workspace/data/CONVENTIONS.md"
+        description: "Project conventions and guidelines"
+
+  - name: "Tests"
+    description: "Test suite"
+    files:
+      - path: "tests/test_integration.py"
+        description: "Integration tests"
+      - path: "tests/test_main.py"
+        description: "Unit tests for main module"
+
+  - name: "Scripts"
+    description: "Development and CI scripts"
+    files:
+      - path: "scripts/bootstrap.sh"
+        description: "Development workspace setup"
+      - path: "scripts/quality.sh"
+        description: "Code quality checks"
+      - path: "scripts/verify.sh"
+        description: "Full verification suite"
+
+  - name: "Config"
+    description: "Project configuration files"
+    files:
+      - path: "pyproject.toml"
+        description: "Project metadata and tool configuration"
+      - path: ".pre-commit-config.yaml"
+        description: "Pre-commit hooks configuration"
+      - path: "README.md"
+        description: "Project documentation"

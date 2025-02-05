@@ -1,1 +1,8 @@
-#
+name: "{project_name}"
+description: "CodeCompanion workspace for {project_name}"
+groups:
+  - name: "Main"
+    description: "Project files"
+    files:
+      - path: ".cc/data/CONVENTIONS.md"
+        description: "Project conventions and guidelines"

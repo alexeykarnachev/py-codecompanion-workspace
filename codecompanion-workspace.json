@@ -1,16 +1,100 @@
 {
   "name": "cc-workspace",
-  "description": "CodeCompanion workspace for cc-workspace",
+  "description": "Development workspace for cc-workspace",
   "system_prompt": null,
   "groups": [
     {
-      "name": "Main",
-      "description": "Project files",
+      "name": "Core",
+      "description": "Core package files",
       "system_prompt": null,
       "files": [
         {
+          "description": "Package entry point",
+          "path": "cc_workspace/__main__.py"
+        },
+        {
+          "description": "Main CLI implementation",
+          "path": "cc_workspace/main.py"
+        }
+      ],
+      "symbols": []
+    },
+    {
+      "name": "Package Data",
+      "description": "Package data files",
+      "system_prompt": null,
+      "files": [
+        {
+          "description": "Default workspace template",
+          "path": "cc_workspace/data/templates/default.yaml"
+        },
+        {
+          "description": "Development workspace template",
+          "path": "cc_workspace/data/templates/_ccw_dev.yaml"
+        },
+        {
+          "description": "CodeCompanion detailed documentation",
+          "path": "cc_workspace/data/codecompanion_doc.md"
+        },
+        {
           "description": "Project conventions and guidelines",
-          "path": ".cc/data/CONVENTIONS.md"
+          "path": "cc_workspace/data/CONVENTIONS.md"
+        }
+      ],
+      "symbols": []
+    },
+    {
+      "name": "Tests",
+      "description": "Test suite",
+      "system_prompt": null,
+      "files": [
+        {
+          "description": "Integration tests",
+          "path": "tests/test_integration.py"
+        },
+        {
+          "description": "Unit tests for main module",
+          "path": "tests/test_main.py"
+        }
+      ],
+      "symbols": []
+    },
+    {
+      "name": "Scripts",
+      "description": "Development and CI scripts",
+      "system_prompt": null,
+      "files": [
+        {
+          "description": "Development workspace setup",
+          "path": "scripts/bootstrap.sh"
+        },
+        {
+          "description": "Code quality checks",
+          "path": "scripts/quality.sh"
+        },
+        {
+          "description": "Full verification suite",
+          "path": "scripts/verify.sh"
+        }
+      ],
+      "symbols": []
+    },
+    {
+      "name": "Config",
+      "description": "Project configuration files",
+      "system_prompt": null,
+      "files": [
+        {
+          "description": "Project metadata and tool configuration",
+          "path": "pyproject.toml"
+        },
+        {
+          "description": "Pre-commit hooks configuration",
+          "path": ".pre-commit-config.yaml"
+        },
+        {
+          "description": "Project documentation",
+          "path": "README.md"
         }
       ],
       "symbols": []
