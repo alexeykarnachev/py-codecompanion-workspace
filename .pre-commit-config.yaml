@@ -3,8 +3,11 @@ repos:
     rev: v4.5.0
     hooks:
     -   id: trailing-whitespace
-    -   id: end-of-file-fixer
     -   id: check-yaml
+    -   id: check-json
+    -   id: check-toml
+    -   id: mixed-line-ending
+        args: [--fix=no]
     -   id: check-added-large-files
 
 -   repo: https://github.com/pycqa/isort
@@ -26,16 +29,16 @@ repos:
 
 -   repo: local
     hooks:
-    -   id: lint-check
-        name: Run linting checks
-        entry: bash scripts/lint.sh
+    -   id: quality-check
+        name: Code quality checks
+        entry: bash scripts/quality.sh
         language: system
         pass_filenames: false
         stages: [pre-commit]
 
-    -   id: full-check
-        name: Run full checks with tests
-        entry: bash scripts/check.sh
+    -   id: verify
+        name: Full verification
+        entry: bash scripts/verify.sh
         language: system
         pass_filenames: false
         stages: [pre-push]
