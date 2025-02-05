@@ -1,10 +1,10 @@
 import importlib.resources
 from pathlib import Path
-from typing import Any, Self
+from typing import Annotated, Any, Self
 
 import typer
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
@@ -42,10 +42,14 @@ class FileRef(BaseModel):
     path: str
 
 
+# Create a custom type that converts None to empty string
+StringOrEmpty = Annotated[str, BeforeValidator(lambda x: "" if x is None else x)]
+
+
 class Group(BaseModel):
     name: str
     description: str | None = None
-    system_prompt: str | None = None
+    system_prompt: StringOrEmpty | None = None  # Now this works
     files: list[FileRef] = Field(default_factory=list)
     symbols: list[FileRef] = Field(default_factory=list)
 
@@ -53,7 +57,7 @@ class Group(BaseModel):
 class Workspace(BaseModel):
     name: str
     description: str | None = None
-    system_prompt: str | None = None
+    system_prompt: StringOrEmpty | None = None  # Now this works
     groups: list[Group] = Field(default_factory=list)
 
 

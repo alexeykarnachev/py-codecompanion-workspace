@@ -45,6 +45,7 @@ dev = [
     "pytest>=8.3.4",
     "pytest-cov>=6.0.0",
     "ruff>=0.9.4",
+    "types-aiofiles>=24.1.0.20241221",
     "types-pyyaml>=6.0.12.20241230",
 ]
 
