@@ -1,0 +1,71 @@
+name: "{project_name}"
+description: "Development workspace for {project_name}"
+groups:
+  - name: "All"
+    description: "All project files"
+    files:
+      - pattern: "**/*"
+        description: "Project file"
+
+  - name: "Source"
+    description: "Source code files"
+    files:
+      - pattern: "**/*.py"
+        description: "Python file"
+      - pattern: "**/*.rs"
+        description: "Rust file"
+      - pattern: "**/*.go"
+        description: "Go file"
+      - pattern: "**/*.js"
+        description: "JavaScript file"
+      - pattern: "**/*.ts"
+        description: "TypeScript file"
+
+  - name: "Documentation"
+    description: "Documentation files"
+    files:
+      - pattern: "**/*.md"
+        description: "Markdown file"
+      - pattern: "**/*.rst"
+        description: "reStructuredText file"
+      - pattern: "docs/**/*"
+        description: "Documentation file"
+
+  - name: "Tests"
+    description: "Test files"
+    files:
+      - pattern: "test*/**/*"
+        description: "Test file"
+      - pattern: "**/test_*.py"
+        description: "Python test"
+      - pattern: "**/*_test.go"
+        description: "Go test"
+      - pattern: "**/*.test.ts"
+        description: "TypeScript test"
+
+  - name: "Scripts"
+    description: "Build and utility scripts"
+    files:
+      - pattern: "scripts/**/*"
+        description: "Script file"
+      - pattern: "tools/**/*"
+        description: "Tool script"
+      - pattern: "*.sh"
+        description: "Shell script"
+
+  - name: "Config"
+    description: "Configuration files"
+    files:
+      - pattern: "**/*.toml"
+        description: "TOML config"
+      - pattern: "**/*.yaml"
+        description: "YAML config"
+      - pattern: "**/*.json"
+        description: "JSON config"
+      - pattern: "**/Makefile"
+        description: "Makefile"
+      - pattern: "**/Dockerfile"
+        description: "Docker config"
+      - pattern: "**/.gitignore"
+        description: "Git ignore rules"
+

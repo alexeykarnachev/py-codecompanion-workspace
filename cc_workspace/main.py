@@ -1,10 +1,10 @@
 import importlib.resources
 from pathlib import Path
-from typing import Annotated, Any, Self
+from typing import Any
 
 import typer
 import yaml
-from pydantic import BaseModel, BeforeValidator, Field
+from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
@@ -42,26 +42,56 @@ class FileRef(BaseModel):
     path: str
 
 
-# Create a custom type that converts None to empty string
-StringOrEmpty = Annotated[str, BeforeValidator(lambda x: "" if x is None else x)]
+class FilePattern(BaseModel):
+    pattern: str
+    description: str | None = None
 
 
 class Group(BaseModel):
     name: str
     description: str | None = None
-    system_prompt: StringOrEmpty | None = None  # Now this works
-    files: list[FileRef] = Field(default_factory=list)
+    system_prompt: str = ""
+    files: list[FileRef | FilePattern] = Field(default_factory=list)
+    resolved_files: list[FileRef] | None = Field(default=None, exclude=True)
     symbols: list[FileRef] = Field(default_factory=list)
+
+    def get_files(self) -> list[FileRef]:
+        """Get resolved files, resolving patterns if needed"""
+        if self.resolved_files is None:
+            raise ValueError("Files not resolved. Call resolve_patterns() first")
+        return self.resolved_files
+
+    def resolve_patterns(self, base_path: Path) -> None:
+        """Resolve glob patterns to actual files"""
+        resolved: list[FileRef] = []
+
+        for spec in self.files:
+            if isinstance(spec, FilePattern):
+                # Handle glob pattern
+                for path in sorted(base_path.glob(spec.pattern)):
+                    if path.is_file():
+                        desc = (
+                            spec.description or f"{path.stem.replace('_', ' ').title()}"
+                        )
+                        resolved.append(
+                            FileRef(
+                                path=str(path.relative_to(base_path)), description=desc
+                            )
+                        )
+            else:
+                # Handle explicit FileRef
+                resolved.append(spec)
+
+        self.resolved_files = resolved
 
 
 class Workspace(BaseModel):
     name: str
     description: str | None = None
-    system_prompt: StringOrEmpty | None = None  # Now this works
+    system_prompt: str = ""
     groups: list[Group] = Field(default_factory=list)
 
 
-# Template Models
 class Template(BaseModel):
     name: str
     description: str
@@ -70,7 +100,7 @@ class Template(BaseModel):
         default_factory=lambda: {"project_name": "Project name"}
     )
 
-    def render(self: Self, **kwargs: Any) -> Workspace:
+    def render(self, **kwargs: Any) -> Workspace:
         """Render template with variables and return validated Workspace"""
         content = self.content.format(**kwargs)
         config = yaml.safe_load(content)
@@ -146,7 +176,6 @@ def load_templates() -> TemplateLibrary:
     return TemplateLibrary(templates=templates)
 
 
-# Replace static TEMPLATES with:
 TEMPLATES = load_templates()
 
 
@@ -185,8 +214,13 @@ def validate_workspace_files(workspace: Workspace, base_path: Path) -> list[str]
     """Validate all files in workspace exist"""
     errors = []
 
+    # First resolve all patterns
     for group in workspace.groups:
-        for file in group.files:
+        group.resolve_patterns(base_path)
+
+    # Then validate resolved files
+    for group in workspace.groups:
+        for file in group.get_files():
             path = base_path / file.path
             if not path.exists():
                 errors.append(f"File not found: {file.path}")
@@ -271,25 +305,3 @@ def compile_config(
 
 if __name__ == "__main__":
     app()
-
-
-# TODO: [see below]
-
-# 1. Tests:
-# - Add test for `uv` package management in `setup_dev_workspace.sh`
-# - Test workspace file validation (invalid YAML structure, missing required fields)
-# - Test template variables substitution
-
-# 2. Features:
-# - Add workspace validation command (`ccw validate`)
-# - Add template list command (`ccw templates list`)
-# - Add template creation command (`ccw templates new`)
-# - Support URLs in workspace files (like CodeCompanion.nvim does)
-
-# 3. Code improvements:
-# - Move templates to separate YAML files
-# - Add proper error messages for workspace validation
-# - Add workspace schema version validation
-
-# The most important next step is workspace validation
-# since it will help catch configuration errors early.

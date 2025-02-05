@@ -1,10 +1,10 @@
 name: cc-workspace
 description: Development workspace for cc-workspace
-system_prompt: null
+system_prompt: ''
 groups:
 - name: Core
   description: Core package files
-  system_prompt: null
+  system_prompt: ''
   files:
   - description: Package entry point
     path: cc_workspace/__main__.py
@@ -13,7 +13,7 @@ groups:
   symbols: []
 - name: Package Data
   description: Package data files
-  system_prompt: null
+  system_prompt: ''
   files:
   - description: Default workspace template
     path: cc_workspace/data/templates/default.yaml
@@ -26,7 +26,7 @@ groups:
   symbols: []
 - name: Tests
   description: Test suite
-  system_prompt: null
+  system_prompt: ''
   files:
   - description: Integration tests
     path: tests/test_integration.py
@@ -35,7 +35,7 @@ groups:
   symbols: []
 - name: Scripts
   description: Development and CI scripts
-  system_prompt: null
+  system_prompt: ''
   files:
   - description: Development workspace setup
     path: scripts/bootstrap.sh
@@ -46,7 +46,7 @@ groups:
   symbols: []
 - name: Config
   description: Project configuration files
-  system_prompt: null
+  system_prompt: ''
   files:
   - description: Project metadata and tool configuration
     path: pyproject.toml

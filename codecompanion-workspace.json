@@ -1,12 +1,12 @@
 {
   "name": "cc-workspace",
   "description": "Development workspace for cc-workspace",
-  "system_prompt": null,
+  "system_prompt": "",
   "groups": [
     {
       "name": "Core",
       "description": "Core package files",
-      "system_prompt": null,
+      "system_prompt": "",
       "files": [
         {
           "description": "Package entry point",
@@ -22,7 +22,7 @@
     {
       "name": "Package Data",
       "description": "Package data files",
-      "system_prompt": null,
+      "system_prompt": "",
       "files": [
         {
           "description": "Default workspace template",
@@ -46,7 +46,7 @@
     {
       "name": "Tests",
       "description": "Test suite",
-      "system_prompt": null,
+      "system_prompt": "",
       "files": [
         {
           "description": "Integration tests",
@@ -62,7 +62,7 @@
     {
       "name": "Scripts",
       "description": "Development and CI scripts",
-      "system_prompt": null,
+      "system_prompt": "",
       "files": [
         {
           "description": "Development workspace setup",
@@ -82,7 +82,7 @@
     {
       "name": "Config",
       "description": "Project configuration files",
-      "system_prompt": null,
+      "system_prompt": "",
       "files": [
         {
           "description": "Project metadata and tool configuration",
