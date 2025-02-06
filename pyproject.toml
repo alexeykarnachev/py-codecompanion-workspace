@@ -1,6 +1,6 @@
 [project]
 name = "cc_workspace"
-version = "0.1.0"
+dynamic = ["version"]
 description = "CodeCompanion workspace generator"
 authors = [
     { name = "Alexey Karnachev", email = "alekseykarnachev@gmail.com" }
@@ -31,6 +31,9 @@ dependencies = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "cc_workspace/__init__.py"
 
 [tool.hatch.build]
 include = [
