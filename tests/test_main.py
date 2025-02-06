@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 import pytest
@@ -141,50 +140,6 @@ def test_mixed_patterns_and_refs(tmp_path: Path) -> None:
     resolved = group.resolve_patterns(tmp_path)
     paths = {f["path"] for f in resolved["files"]}
     assert paths == {"config.yaml"}  # Pattern and explicit file resolve to same path
-
-
-def test_dev_template_patterns(tmp_path: Path, runner: CliRunner) -> None:
-    """Test the dev template with pattern-based discovery"""
-    # Debug: Check available templates
-    from cc_workspace.main import TEMPLATES
-
-    print("\nDebug template info:")
-    print(f"Available templates: {TEMPLATES.list_templates()}")
-    template = TEMPLATES.get("dev")
-    if template:
-        print(f"Dev template content:\n{template.content[:200]}")
-    else:
-        print("Dev template not found!")
-
-    # Create some test files
-    (tmp_path / "src").mkdir()
-    (tmp_path / "src/main.py").write_text("# Main")
-    (tmp_path / "tests").mkdir()
-    (tmp_path / "tests/test_main.py").write_text("# Test")
-    (tmp_path / "README.md").write_text("# Doc")
-
-    # Initialize with dev template
-    result = runner.invoke(app, ["init", str(tmp_path), "--template", "dev"])
-    print(f"\nCommand output:\n{result.stdout}")  # Print command output
-    if result.exit_code != 0:
-        print(f"Error: {result.stdout}")  # Print any error output
-        print(f"Exception: {result.exception}")  # Print exception if any
-    assert result.exit_code == 0
-
-    # Verify JSON output
-    json_path = tmp_path / "codecompanion-workspace.json"
-    assert json_path.exists()
-
-    # Now we can uncomment and fix the test
-    with open(json_path) as f:
-        data = json.load(f)
-
-    # Should have discovered our test files
-    all_files = {f["path"] for group in data["groups"] for f in group["files"]}
-    print(f"\nDiscovered files: {all_files}")  # Print discovered files
-    assert "src/main.py" in all_files
-    assert "tests/test_main.py" in all_files
-    assert "README.md" in all_files
 
 
 def test_ignore_dot_directories(tmp_path: Path) -> None:

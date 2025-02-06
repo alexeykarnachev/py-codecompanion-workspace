@@ -252,8 +252,12 @@ class Workspace(BaseModel):
 
     def resolve_patterns(self, base_path: Path) -> dict[str, Any]:
         """Resolve patterns in all groups"""
-        data = self.model_dump()
-        data["groups"] = [g.resolve_patterns(base_path) for g in self.groups]
+        data = {
+            "name": self.name,
+            "description": self.description,
+            "system_prompt": self.system_prompt,
+            "groups": [g.resolve_patterns(base_path) for g in self.groups],
+        }
         return data
 
 

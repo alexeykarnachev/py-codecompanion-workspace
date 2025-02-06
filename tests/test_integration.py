@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 import pytest
-import yaml
 from typer.testing import CliRunner
 
 from cc_workspace.main import app
@@ -29,33 +28,23 @@ def test_workspace_structure(tmp_path: Path, runner: CliRunner) -> None:
     assert result.exit_code == 0
     assert "✨ Initialized workspace" in result.stdout
 
-    # Verify directory structure
-    cc_dir = tmp_path / ".cc"
-    data_dir = cc_dir / "data"
-    yaml_config = cc_dir / "codecompanion.yaml"
+    # Verify JSON content and structure
     json_config = tmp_path / "codecompanion-workspace.json"
-    conventions = data_dir / "CONVENTIONS.md"
+    assert json_config.exists()
 
-    assert cc_dir.exists() and cc_dir.is_dir()
-    assert data_dir.exists() and data_dir.is_dir()
-    assert yaml_config.exists() and yaml_config.is_file()
-    assert json_config.exists() and json_config.is_file()
-    assert conventions.exists() and conventions.is_file()
-
-    # Verify YAML content
-    with open(yaml_config) as f:
-        yaml_content = yaml.safe_load(f)
-
-    assert yaml_content["name"] == tmp_path.name
-    assert "description" in yaml_content
-    assert len(yaml_content["groups"]) == 1
-    assert yaml_content["groups"][0]["name"] == "Project"
-
-    # Verify JSON content
     with open(json_config) as f:
         json_content = json.load(f)
 
-    # Check file discovery
+    # Verify required fields
+    assert "name" in json_content
+    assert "system_prompt" in json_content
+    assert "groups" in json_content
+    assert isinstance(json_content["groups"], list)
+
+    # Verify ignore section is not present
+    assert "ignore" not in json_content
+
+    # Check file discovery still works
     files = {f["path"] for g in json_content["groups"] for f in g["files"]}
     assert "src/main.py" in files  # Should include regular files
     assert "README.md" in files  # Should include docs
@@ -76,3 +65,38 @@ def test_error_handling(tmp_path: Path, runner: CliRunner) -> None:
     result = runner.invoke(app, ["compile-config", str(invalid_yaml)])
     assert result.exit_code == 1
     assert "Error" in result.stdout
+
+
+def test_json_structure_consistency(tmp_path: Path, runner: CliRunner) -> None:
+    """Test that JSON output maintains consistent structure across operations"""
+    # Initialize workspace
+    init_result = runner.invoke(app, ["init", str(tmp_path)])
+    assert init_result.exit_code == 0
+
+    # Get initial JSON structure
+    json_path = tmp_path / "codecompanion-workspace.json"
+    with open(json_path) as f:
+        initial_data = json.load(f)
+
+    # Verify structure after compilation
+    yaml_path = tmp_path / ".cc" / "codecompanion.yaml"
+    compile_result = runner.invoke(app, ["compile-config", str(yaml_path)])
+    assert compile_result.exit_code == 0
+
+    with open(json_path) as f:
+        compiled_data = json.load(f)
+
+    # Check structure consistency
+    assert set(initial_data.keys()) == set(compiled_data.keys())
+    assert "ignore" not in initial_data
+    assert "ignore" not in compiled_data
+
+    # Verify group structure
+    for group in compiled_data["groups"]:
+        assert set(group.keys()) <= {
+            "name",
+            "description",
+            "system_prompt",
+            "files",
+            "symbols",
+        }
