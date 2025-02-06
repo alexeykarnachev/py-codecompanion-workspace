@@ -1,32 +1,25 @@
 [project]
-name = "cc_workspace"
+name = "cc-workspace"
 dynamic = ["version"]
 description = "CodeCompanion workspace generator"
-authors = [
-    { name = "Alexey Karnachev", email = "alekseykarnachev@gmail.com" }
-]
+readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
 keywords = ["neovim", "codecompanion", "workspace"]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Environment :: Console",
-    "Intended Audience :: Developers",
-    "Topic :: Software Development :: Build Tools",
+authors = [
+    { name = "Alexey Karnachev", email = "alekseykarnachev@gmail.com" }
 ]
 dependencies = [
     "aiofiles>=24.1.0",
-    "mypy>=1.14.1",
     "pydantic>=2.10.6",
-    "pytest>=8.3.4",
-    "pytest-asyncio>=0.25.3",
-    "pytest-cov>=6.0.0",
     "pyyaml>=6.0.2",
     "rich>=13.9.4",
-    "ruff>=0.9.4",
     "typer>=0.15.1",
-    "types-pyyaml>=6.0.12.20241230",
 ]
+
+[project.urls]
+homepage = "https://github.com/alexeykarnachev/py-codecompanion-workspace"
+repository = "https://github.com/alexeykarnachev/py-codecompanion-workspace"
 
 [build-system]
 requires = ["hatchling"]
@@ -39,66 +32,15 @@ path = "cc_workspace/__init__.py"
 include = [
     "cc_workspace/**/*.py",
     "cc_workspace/**/*.md",
+    "cc_workspace/data/**/*",
 ]
 
-[dependency-groups]
-dev = [
-    "cc-workspace",
-    "isort>=6.0.0",
-    "mypy>=1.14.1",
-    "pre-commit>=4.1.0",
-    "pytest>=8.3.4",
-    "pytest-cov>=6.0.0",
-    "ruff>=0.9.4",
-    "types-aiofiles>=24.1.0.20241221",
-    "types-pyyaml>=6.0.12.20241230",
-]
+[tool.hatch.build.targets.wheel]
+packages = ["cc_workspace"]
 
 [project.scripts]
 ccw = "cc_workspace.main:app"
 
-[tool.ruff]
-line-length = 88
-target-version = "py312"
+[tool.hatch.metadata]
+allow-direct-references = true
 
-[tool.ruff.lint]
-dummy-variable-rgx = "^_$"
-select = [
-    "F",    # Pyflakes
-    "E",    # pycodestyle
-    "W",    # pycodestyle
-    "I",    # isort
-    "N",    # pep8-naming
-    "UP",   # pyupgrade
-    "B",    # flake8-bugbear
-    "A",    # flake8-builtins
-    "C4",   # flake8-comprehensions
-    "SIM",  # flake8-simplify
-    "ERA",  # eradicate
-    "PL",   # Pylint
-    "RUF",  # Ruff-specific rules
-    "ARG",  # flake8-unused-arguments
-    "F504", # Unused variable from tuple assignment
-    "F841", # Unused variable
-]
-ignore = []
-per-file-ignores = { "__init__.py" = ["F401"], "tests/*" = ["PLR2004"] }
-
-[tool.ruff.lint.pycodestyle]
-ignore-overlong-task-comments = true
-
-[tool.ruff.lint.mccabe]
-max-complexity = 10
-
-[tool.ruff.lint.isort]
-known-first-party = ["cc_workspace"]
-
-[tool.ruff.lint.flake8-unused-arguments]
-ignore-variadic-names = true
-
-[tool.uv.sources]
-cc-workspace = { workspace = true }
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
