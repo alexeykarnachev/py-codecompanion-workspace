@@ -1,19 +1,27 @@
 import asyncio
 import re
 from pathlib import Path
-from typing import List, Optional
 
 import aiofiles
 import typer
 from pydantic import BaseModel, Field
-from rich import print
 from rich.console import Console
 from rich.prompt import Confirm
+
+app = typer.Typer()
+console = Console()
+
+# Define arguments as module-level constants
+SOURCE_ARG = typer.Argument(..., help="Source directory with markdown files")
+
+OUTPUT_ARG = typer.Argument(..., help="Output file path")
+
+INTERACTIVE_OPT = typer.Option(True, help="Enable interactive file selection")
 
 
 class SourceFile(BaseModel):
     path: Path
-    content: Optional[str] = None
+    content: str | None = None
     level: int = Field(default=1, ge=1)
 
 
@@ -30,12 +38,8 @@ class CombinerConfig(BaseModel):
     config: ProcessingConfig = Field(default_factory=ProcessingConfig)
 
 
-console = Console()
-app = typer.Typer()
-
-
-async def discover_files(config: CombinerConfig) -> List[SourceFile]:
-    files = []
+async def discover_files(config: CombinerConfig) -> list[SourceFile]:
+    files: list[Path] = []
     for pattern in config.config.include_patterns:
         files.extend(config.source.glob(pattern))
 
@@ -49,7 +53,7 @@ async def discover_files(config: CombinerConfig) -> List[SourceFile]:
 
 
 async def process_file(file: SourceFile, config: ProcessingConfig) -> str:
-    async with aiofiles.open(file.path, "r", encoding="utf-8") as f:
+    async with aiofiles.open(file.path, encoding="utf-8") as f:
         content = await f.read()
 
     if config.adjust_headers:
@@ -69,16 +73,22 @@ async def process_file(file: SourceFile, config: ProcessingConfig) -> str:
     return content
 
 
+async def write_output(path: Path, content: str) -> None:
+    """Write content to the output file."""
+    async with aiofiles.open(path, "w", encoding="utf-8") as f:
+        await f.write(content)
+
+
 @app.command()
 def merge(
-    source: Path = typer.Argument(..., help="Source directory with markdown files"),
-    output: Path = typer.Argument(..., help="Output file path"),
-    interactive: bool = typer.Option(True, help="Enable interactive file selection"),
+    source: Path = SOURCE_ARG,
+    output: Path = OUTPUT_ARG,
+    interactive: bool = INTERACTIVE_OPT,
 ) -> None:
     """Merge markdown documents into a single file."""
     config = CombinerConfig(source=source, output=output)
 
-    async def run():
+    async def run() -> None:
         files = await discover_files(config)
 
         if not files:
@@ -86,21 +96,21 @@ def merge(
             raise typer.Exit(1)
 
         if interactive:
-            print("\nFound files:")
+            console.print("\nFound files:")
             for f in files:
-                print(f"  - {f.path.relative_to(source)}")
+                console.print(f"  - {f.path.relative_to(source)}")
 
             if not Confirm.ask("\nProceed with these files?"):
                 raise typer.Exit()
 
-        contents = []
+        contents: list[str] = []
         with console.status("Processing files..."):
             for file in files:
                 content = await process_file(file, config.config)
                 contents.append(content)
 
-        async with aiofiles.open(output, "w", encoding="utf-8") as f:
-            await f.write("\n\n".join(contents))
+        merged_content = "\n\n".join(contents)
+        await write_output(output, merged_content)
 
         console.print(
             f"[green]Successfully merged {len(files)} files to {output}[/green]"

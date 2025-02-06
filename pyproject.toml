@@ -98,6 +98,4 @@ cc-workspace = { workspace = true }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-markers = [
-    "asyncio: mark test as async/await test",
-]
+asyncio_default_fixture_loop_scope = "function"
