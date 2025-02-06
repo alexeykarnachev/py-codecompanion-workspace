@@ -301,7 +301,9 @@ def test_ignore_patterns_with_explicit_files(tmp_path: Path) -> None:
         name="Test",
         description="Test group",
         files=[
+            # Pattern-based discovery - follows ignore rules
             File(path="**/*.py", description="Python files", kind="pattern"),
+            # Explicit files - bypass ignore rules
             File(path=".git/important.txt", description="Important file", kind="file"),
             File(path="src/.env", description="Env file", kind="file"),
         ],
@@ -312,10 +314,9 @@ def test_ignore_patterns_with_explicit_files(tmp_path: Path) -> None:
     paths = {f["path"] for f in resolved["files"]}
 
     # Verify behavior
-    assert "src/main.py" in paths  # Should include from pattern
-    assert ".git/important.txt" not in paths  # Should ignore despite explicit inclusion
-    assert "src/.env" not in paths  # Should ignore despite explicit inclusion
-    print(f"Resolved paths: {paths}")  # For debugging
+    assert "src/main.py" in paths  # Include from pattern
+    assert ".git/important.txt" in paths  # Include explicit file even in dot dir
+    assert "src/.env" in paths  # Include explicit file even if hidden
 
 
 def test_ignore_nested_dot_directories(tmp_path: Path) -> None:

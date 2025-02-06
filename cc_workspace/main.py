@@ -136,6 +136,10 @@ class File(BaseModel):
 
     def should_ignore(self, path: str) -> bool:
         """Check if path matches any ignore pattern"""
+        # Don't apply ignore patterns to explicitly listed files
+        if self.kind == "file":
+            return False
+
         # Normalize path
         path = str(path)
         if path.startswith("./"):
@@ -147,13 +151,10 @@ class File(BaseModel):
             return True
 
         # For patterns, check other ignore rules
-        if self.kind == "pattern":
-            return any(
-                fnmatch.fnmatch(path, pattern) if "*" in pattern else pattern in path
-                for pattern in self.ignore_patterns
-            )
-
-        return False
+        return any(
+            fnmatch.fnmatch(path, pattern) if "*" in pattern else pattern in path
+            for pattern in self.ignore_patterns
+        )
 
     def resolve(self, base_path: Path) -> list["File"]:
         """Resolve pattern into actual files"""

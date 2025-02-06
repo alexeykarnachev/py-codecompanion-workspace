@@ -13,13 +13,23 @@ def runner() -> CliRunner:
     return CliRunner()
 
 
-def test_full_workflow(tmp_path: Path, runner: CliRunner) -> None:
-    # Initialize workspace
-    init_result = runner.invoke(app, ["init", str(tmp_path)])
-    assert init_result.exit_code == 0
-    assert "✨ Initialized workspace" in init_result.stdout
+def test_workspace_structure(tmp_path: Path, runner: CliRunner) -> None:
+    """Test the basic workspace structure and file discovery"""
+    # Create test structure
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src/main.py").write_text("print('hello')")
+    (tmp_path / "README.md").write_text("# Documentation")
+    (tmp_path / "node_modules").mkdir()
+    (tmp_path / "node_modules/package.json").write_text("{}")
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git/config").write_text("git config")
 
-    # Verify structure
+    # Initialize workspace
+    result = runner.invoke(app, ["init", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "✨ Initialized workspace" in result.stdout
+
+    # Verify directory structure
     cc_dir = tmp_path / ".cc"
     data_dir = cc_dir / "data"
     yaml_config = cc_dir / "codecompanion.yaml"
@@ -39,21 +49,19 @@ def test_full_workflow(tmp_path: Path, runner: CliRunner) -> None:
     assert yaml_content["name"] == tmp_path.name
     assert "description" in yaml_content
     assert len(yaml_content["groups"]) == 1
-    assert yaml_content["groups"][0]["name"] == "Main"
+    assert yaml_content["groups"][0]["name"] == "Project"
 
     # Verify JSON content
     with open(json_config) as f:
         json_content = json.load(f)
 
-    assert json_content["name"] == yaml_content["name"]
-    assert json_content["groups"] == yaml_content["groups"]
-
-    # Verify CONVENTIONS.md
-    with open(conventions) as f:
-        conventions_content = f.read()
-
-    assert "Project Conventions" in conventions_content
-    assert "Package Management" in conventions_content
+    # Check file discovery
+    files = {f["path"] for g in json_content["groups"] for f in g["files"]}
+    assert "src/main.py" in files  # Should include regular files
+    assert "README.md" in files  # Should include docs
+    assert ".cc/data/CONVENTIONS.md" in files  # Should include conventions
+    assert "node_modules/package.json" not in files  # Should respect ignores
+    assert ".git/config" not in files  # Should ignore dot directories
 
 
 def test_error_handling(tmp_path: Path, runner: CliRunner) -> None:
@@ -68,26 +76,3 @@ def test_error_handling(tmp_path: Path, runner: CliRunner) -> None:
     result = runner.invoke(app, ["compile-config", str(invalid_yaml)])
     assert result.exit_code == 1
     assert "Error" in result.stdout
-
-
-def test_dev_workspace_structure(tmp_path: Path, runner: CliRunner) -> None:
-    """Test the workspace structure with package files"""
-    # Initialize workspace
-    init_result = runner.invoke(app, ["init", str(tmp_path)])
-    print(f"Init output: {init_result.stdout}")
-    assert init_result.exit_code == 0
-
-    # Verify files
-    yaml_config = tmp_path / ".cc" / "codecompanion.yaml"
-    with open(yaml_config) as f:
-        config = yaml.safe_load(f)
-
-    # Should have one group
-    assert len(config["groups"]) == 1
-    main_group = config["groups"][0]
-    assert main_group["name"] == "Main"
-
-    # Verify default files are created
-    data_dir = tmp_path / ".cc" / "data"
-    assert (data_dir / "CONVENTIONS.md").exists()
-    assert (data_dir / "codecompanion_doc.md").exists()

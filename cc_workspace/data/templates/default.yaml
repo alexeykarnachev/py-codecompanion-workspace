@@ -10,9 +10,13 @@ ignore:
     - workspace
     - locks
 groups:
-  - name: "Main"
-    description: "Project files"
+  - name: "Project"
+    description: "All project files and documentation"
     files:
+      - path: "**/*"
+        description: "Project file"
+        kind: "pattern"
       - path: ".cc/data/CONVENTIONS.md"
         description: "Project conventions and guidelines"
+        kind: "file"
 
