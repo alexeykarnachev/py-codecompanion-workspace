@@ -4,9 +4,9 @@ A CLI tool to generate workspace files for [CodeCompanion.nvim](https://github.c
 
 ## Key Features
 - Converts YAML workspace configs to CodeCompanion-compatible JSON format
-- Smart file pattern discovery with customizable ignore rules
+- Smart file pattern discovery with default ignore rules
 - Multiple workspace templates (default and development)
-- Built-in project conventions and documentation
+- Project conventions and documentation included
 
 ## Quick Start
 
@@ -15,26 +15,21 @@ Install the package:
 uv sync
 ```
 
-Activate virtual environment (or use direct path to the `ccw` executable: `./.venv/bin/ccw`):
-```bash
-source .venv/bin/activate
-```
-
 Initialize a new workspace:
 ```bash
 # Basic workspace
 ccw init
 
-# Development workspace with extended patterns
+# Development workspace
 ccw init --template dev
 ```
 
 This will create `./.cc/` directory with:
 - `codecompanion.yaml` - workspace configuration in YAML format
 - `data/` - project documentation and conventions
-- `codecompanion-workspace.json` - compiled configuration
+- `codecompanion-workspace.json` - compiled configuration in project root
 
-Modify the YAML config and apply changes:
+Modify the YAML config and recompile:
 ```bash
 ccw compile-config ./.cc/codecompanion.yaml
 ```
@@ -47,33 +42,26 @@ Control which files are included in your workspace:
 
 ```yaml
 ignore:
-  enabled: true
-  # Use specific categories of ignore patterns
-  categories:
-    - dependencies  # node_modules, venv, __pycache__, etc.
-    - ide          # .vscode, .idea, etc.
-    - temp         # *.log, tmp/, etc.
-    - packages     # *.egg-info, dist/, etc.
-    - workspace    # .cc/, .git/, etc.
-    - locks        # package lock files
-
-  # Override patterns for specific categories
-  patterns:
-    locks:
-      - custom.lock
-      - special.lock
-
-  # Add your own patterns
-  additional:
+  enabled: true  # Set to false to include all files
+  additional:    # Add your own patterns to ignore
     - "*.generated.*"
     - ".coverage.*"
 ```
+
+By default, the tool ignores:
+- Dependencies (node_modules, venv, __pycache__, etc.)
+- IDE files (.vscode, .idea, etc.)
+- Temporary files (*.log, tmp/, etc.)
+- Package artifacts (*.egg-info, dist/, etc.)
+- Workspace files (.cc/, .git/, etc.)
+- Lock files (package-lock.json, etc.)
+- Empty files and symlinks
 
 ### Templates
 
 Available templates:
 - `default` - Basic workspace with minimal configuration
-- `dev` - Development workspace with comprehensive file patterns and documentation
+- `dev` - Development workspace with extended patterns and documentation
 
 ## Development
 
