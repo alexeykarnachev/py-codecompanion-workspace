@@ -8,7 +8,7 @@ import typer
 import yaml
 from pydantic import BaseModel, Field
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import Progress, TextColumn
 
 app = typer.Typer()
 console = Console()
@@ -42,30 +42,97 @@ class File(BaseModel):
     description: str | None = None
     path: str
     kind: Literal["file", "pattern"] = "file"
+    _ignore_patterns: set[str] | None = None
 
-    IGNORE_PATTERNS: ClassVar[set[str]] = {
-        # Dependencies
-        "node_modules/",
-        "venv/",
-        ".env/",
-        "__pycache__/",
-        "*.pyc",
-        "target/",
-        "dist/",
-        "build/",
-        # IDE and editor files
-        "*.swp",
-        ".DS_Store",
-        # Logs and temporary files
-        "*.log",
-        "tmp/",
-        "temp/",
-        # Package files
-        "*.egg-info/",
-        "*.egg",
-        # CodeCompanion workspace files
-        ".cc/",
+    model_config = {
+        "arbitrary_types_allowed": True,
     }
+
+    DEFAULT_IGNORE_PATTERNS: ClassVar[dict[str, set[str]]] = {
+        "dependencies": {
+            "node_modules/",
+            "venv/",
+            ".env/",
+            "__pycache__/",
+            "*.pyc",
+            "target/",
+            "dist/",
+            "build/",
+            ".tox/",
+            ".pytest_cache/",
+            ".coverage",
+            "coverage/",
+            ".hypothesis/",
+        },
+        "ide": {
+            "*.swp",
+            ".DS_Store",
+            ".idea/",
+            ".vscode/",
+            "*.sublime-*",
+            ".project",
+            ".settings/",
+            ".classpath",
+            "*.iml",
+        },
+        "temp": {
+            "*.log",
+            "tmp/",
+            "temp/",
+            "*.tmp",
+            "*.bak",
+            "*.swp",
+            "*~",
+        },
+        "packages": {
+            "*.egg-info/",
+            "*.egg",
+            "*.whl",
+            "*.tar.gz",
+            "*.zip",
+        },
+        "workspace": {
+            ".cc/",
+            ".git/",
+            ".hg/",
+            ".svn/",
+        },
+        "locks": {
+            "uv.lock",
+            "poetry.lock",
+            "package-lock.json",
+            "yarn.lock",
+            "pnpm-lock.yaml",
+            "Cargo.lock",
+            "Gemfile.lock",
+            "composer.lock",
+            "mix.lock",
+            "go.sum",
+            "requirements.txt.lock",
+            "Pipfile.lock",
+            "bun.lockb",
+            "deno.lock",
+            "flake.lock",
+            "gradle.lockfile",
+            "Podfile.lock",
+            "pubspec.lock",
+        },
+    }
+
+    @property
+    def ignore_patterns(self) -> set[str]:
+        """Get ignore patterns, using defaults if not set"""
+        if self._ignore_patterns is None:
+            return {
+                pattern
+                for patterns in self.DEFAULT_IGNORE_PATTERNS.values()
+                for pattern in patterns
+            }
+        return self._ignore_patterns
+
+    @ignore_patterns.setter
+    def ignore_patterns(self, patterns: set[str]) -> None:
+        self._ignore_patterns = patterns
 
     def should_ignore(self, path: str) -> bool:
         """Check if path matches any ignore pattern"""
@@ -83,7 +150,7 @@ class File(BaseModel):
         if self.kind == "pattern":
             return any(
                 fnmatch.fnmatch(path, pattern) if "*" in pattern else pattern in path
-                for pattern in self.IGNORE_PATTERNS
+                for pattern in self.ignore_patterns
             )
 
         return False
@@ -159,11 +226,46 @@ class Group(BaseModel):
         return data
 
 
+class WorkspaceIgnore(BaseModel):
+    enabled: bool = True
+    patterns: dict[str, list[str]] = Field(default_factory=dict)
+    additional: list[str] = Field(default_factory=list)
+    categories: list[str] = Field(
+        default_factory=lambda: list(File.DEFAULT_IGNORE_PATTERNS.keys())
+    )
+
+
 class Workspace(BaseModel):
     name: str
     description: str | None = None
     system_prompt: str = ""
     groups: list[Group] = Field(default_factory=list)
+    ignore: WorkspaceIgnore = Field(default_factory=WorkspaceIgnore)
+
+    def get_ignore_patterns(self) -> set[str]:
+        """Get combined ignore patterns based on config"""
+        if not self.ignore.enabled:
+            return set()
+
+        patterns = set()
+
+        # Add patterns from enabled categories
+        for category in self.ignore.categories:
+            if category in File.DEFAULT_IGNORE_PATTERNS:
+                patterns.update(File.DEFAULT_IGNORE_PATTERNS[category])
+
+        # Override with custom patterns
+        for category, custom_patterns in self.ignore.patterns.items():
+            if category in File.DEFAULT_IGNORE_PATTERNS:
+                # Remove default patterns for this category
+                patterns.difference_update(File.DEFAULT_IGNORE_PATTERNS[category])
+                # Add custom patterns
+                patterns.update(custom_patterns)
+
+        # Add additional patterns
+        patterns.update(self.ignore.additional)
+
+        return patterns
 
     def resolve_patterns(self, base_path: Path) -> dict[str, Any]:
         """Resolve patterns in all groups"""
@@ -320,26 +422,26 @@ def compile_workspace(config_path: Path, output_path: Path | None = None) -> Non
     base_path = config_path.parent.parent
 
     with Progress(
-        SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         console=console,
+        transient=True,  # This will clear the progress display when done
     ) as progress:
         # Read and validate YAML
-        progress.add_task("Reading config...", total=None)
+        progress.add_task("├─ Reading config...", total=None)
         with open(config_path) as f:
             config = yaml.safe_load(f)
 
-        progress.add_task("Validating schema...", total=None)
+        progress.add_task("├─ Validating schema...", total=None)
         workspace = Workspace(**config)
 
         # Validate files exist
-        progress.add_task("Checking files...", total=None)
+        progress.add_task("├─ Checking files...", total=None)
         errors = validate_workspace_files(workspace, config_path.parent.parent)
         if errors:
             raise ValueError("\n".join(["Invalid workspace:", *errors]))
 
         # Write JSON with resolved patterns
-        progress.add_task("Writing output...", total=None)
+        progress.add_task("└─ Writing output...", total=None)
         with open(output_path, "w") as f:
             data = workspace.resolve_patterns(base_path=base_path)
             f.write(json.dumps(data, indent=2))
@@ -359,15 +461,9 @@ def init(
 ) -> None:
     """Initialize a new CodeCompanion workspace"""
     try:
-        # Debug output
-        console.print(f"Available templates: {TEMPLATES.list_templates()}")
+        # Debug output - make it more concise
         if template:
-            console.print(f"Selected template: {template}")
-            tmpl = TEMPLATES.get(template)
-            if tmpl:
-                console.print(
-                    f"Template content: {tmpl.content[:100]}..."
-                )  # First 100 chars
+            console.print(f"Using template: {template}")
 
         config_path, cc_dir = create_workspace(path, template)
         console.print(f"✨ Initialized workspace at {path}")

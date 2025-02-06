@@ -1,5 +1,21 @@
 name: "{project_name}"
 description: "Development workspace for {project_name}"
+ignore:
+  enabled: true
+  categories:
+    - dependencies
+    - ide
+    - temp
+    - packages
+    - workspace
+    - locks
+  additional:
+    - "*.generated.*"
+    - ".coverage.*"
+    - "coverage.xml"
+    - "htmlcov/"
+    - ".benchmarks/"
+    - "*.prof"
 groups:
   - name: "All"
     description: "All project files"

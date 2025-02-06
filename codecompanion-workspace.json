@@ -25,10 +25,6 @@
           "description": "Project file"
         },
         {
-          "path": "cc_workspace/data/templates/_ccw_dev.yaml",
-          "description": "Project file"
-        },
-        {
           "path": "cc_workspace/data/templates/default.yaml",
           "description": "Project file"
         },
@@ -66,10 +62,6 @@
         },
         {
           "path": "tests/test_main.py",
-          "description": "Project file"
-        },
-        {
-          "path": "uv.lock",
           "description": "Project file"
         }
       ],
@@ -181,10 +173,6 @@
           "description": "TOML config"
         },
         {
-          "path": "cc_workspace/data/templates/_ccw_dev.yaml",
-          "description": "YAML config"
-        },
-        {
           "path": "cc_workspace/data/templates/default.yaml",
           "description": "YAML config"
         },
@@ -195,5 +183,25 @@
       ],
       "symbols": []
     }
-  ]
+  ],
+  "ignore": {
+    "enabled": true,
+    "patterns": {},
+    "additional": [
+      "*.generated.*",
+      ".coverage.*",
+      "coverage.xml",
+      "htmlcov/",
+      ".benchmarks/",
+      "*.prof"
+    ],
+    "categories": [
+      "dependencies",
+      "ide",
+      "temp",
+      "packages",
+      "workspace",
+      "locks"
+    ]
+  }
 }
