@@ -11,10 +11,15 @@ authors = [
 ]
 dependencies = [
     "aiofiles>=24.1.0",
+    "mypy>=1.15.0",
     "pydantic>=2.10.6",
+    "pytest>=8.3.4",
+    "pytest-cov>=6.0.0",
     "pyyaml>=6.0.2",
     "rich>=13.9.4",
+    "ruff>=0.9.5",
     "typer>=0.15.1",
+    "types-pyyaml>=6.0.12.20241230",
 ]
 
 [project.urls]
@@ -44,3 +49,17 @@ ccw = "cc_workspace.main:app"
 [tool.hatch.metadata]
 allow-direct-references = true
 
+[tool.uv.sources]
+cc-workspace = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "cc-workspace",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"  # Explicitly set scope
+
+[tool.ruff.lint]
+ignore = ["PLR2004"]  # Ignore magic number warning in tests
