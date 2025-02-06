@@ -15,9 +15,11 @@ classifiers = [
     "Topic :: Software Development :: Build Tools",
 ]
 dependencies = [
+    "aiofiles>=24.1.0",
     "mypy>=1.14.1",
     "pydantic>=2.10.6",
     "pytest>=8.3.4",
+    "pytest-asyncio>=0.25.3",
     "pytest-cov>=6.0.0",
     "pyyaml>=6.0.2",
     "rich>=13.9.4",
@@ -94,3 +96,8 @@ ignore-variadic-names = true
 [tool.uv.sources]
 cc-workspace = { workspace = true }
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "asyncio: mark test as async/await test",
+]
