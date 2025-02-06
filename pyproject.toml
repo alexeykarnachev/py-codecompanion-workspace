@@ -62,4 +62,4 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"  # Explicitly set scope
 
 [tool.ruff.lint]
-ignore = ["PLR2004"]  # Ignore magic number warning in tests
+per-file-ignores = { "__init__.py" = ["F401"], "tests/*" = ["PLR2004"] }
