@@ -8,7 +8,7 @@ Install and initialize workspace; in your project's root run:
 
 ```bash
 uv add git+https://github.com/alexeykarnachev/py-codecompanion-workspace
-ccw init
+&& ccw init
 ```
 
 This creates:
