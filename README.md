@@ -2,17 +2,14 @@
 
 A CLI tool to generate workspace files for [CodeCompanion.nvim](https://github.com/olimorris/codecompanion.nvim) from YAML format ✨
 
-## Installation
-
-Install globally:
-```bash
-uv pip install --system cc-workspace
-```
-
 ## Quick Start
 
-Initialize workspace:
+Install and initialize workspace:
+
 ```bash
+# Install from git
+uv add git+https://github.com/alexeykarnachev/py-codecompanion-workspace
+
 # Basic workspace
 ccw init
 
@@ -29,17 +26,4 @@ Update configuration:
 ```bash
 ccw compile-config .cc/codecompanion.yaml
 ```
-
-## Configuration
-
-### File Discovery
-
-Control which files to include:
-
-```yaml
-ignore:
-  enabled: true  # Set to false to include all files
-  additional:    # Add custom patterns
-    - "*.generated.*"
-    - ".coverage"
 
