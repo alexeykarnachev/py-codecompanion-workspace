@@ -49,7 +49,8 @@ class File(BaseModel):
     }
 
     DEFAULT_IGNORE_PATTERNS: ClassVar[dict[str, set[str]]] = {
-        "dependencies": {
+        "default": {
+            # Dependencies
             "node_modules/",
             "venv/",
             ".env/",
@@ -63,8 +64,7 @@ class File(BaseModel):
             ".coverage",
             "coverage/",
             ".hypothesis/",
-        },
-        "ide": {
+            # IDE
             "*.swp",
             ".DS_Store",
             ".idea/",
@@ -74,48 +74,30 @@ class File(BaseModel):
             ".settings/",
             ".classpath",
             "*.iml",
-        },
-        "temp": {
+            # Temp
             "*.log",
             "tmp/",
             "temp/",
             "*.tmp",
             "*.bak",
-            "*.swp",
             "*~",
-        },
-        "packages": {
+            # Packages
             "*.egg-info/",
             "*.egg",
             "*.whl",
             "*.tar.gz",
             "*.zip",
-        },
-        "workspace": {
+            # Workspace
             ".cc/",
             ".git/",
             ".hg/",
             ".svn/",
-        },
-        "locks": {
-            "uv.lock",
-            "poetry.lock",
+            # Locks
+            "*.lock",
             "package-lock.json",
             "yarn.lock",
             "pnpm-lock.yaml",
-            "Cargo.lock",
-            "Gemfile.lock",
-            "composer.lock",
-            "mix.lock",
             "go.sum",
-            "requirements.txt.lock",
-            "Pipfile.lock",
-            "bun.lockb",
-            "deno.lock",
-            "flake.lock",
-            "gradle.lockfile",
-            "Podfile.lock",
-            "pubspec.lock",
         },
     }
 

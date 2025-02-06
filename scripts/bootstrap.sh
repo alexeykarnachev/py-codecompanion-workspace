@@ -12,7 +12,7 @@ uv add pytest pytest-cov ruff mypy types-pyyaml
 
 echo "🚀 Initializing workspace..."
 echo "├─ Creating workspace structure..."
-python -m cc_workspace init . --template dev
+python -m cc_workspace init .
 echo "└─ Workspace initialized"
 
 echo "🔍 Running verification..."

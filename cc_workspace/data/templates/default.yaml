@@ -3,12 +3,7 @@ description: "CodeCompanion workspace for {project_name}"
 ignore:
   enabled: true
   categories:
-    - dependencies
-    - ide
-    - temp
-    - packages
-    - workspace
-    - locks
+    - default
 groups:
   - name: "Project"
     description: "All project files and documentation"

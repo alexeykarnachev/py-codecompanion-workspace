@@ -523,7 +523,7 @@ def test_custom_ignore_patterns(tmp_path: Path) -> None:
     (tmp_path / "src/main.py").write_text("print('hello')")
     (tmp_path / "custom.lock").write_text("lock")
     (tmp_path / ".env").write_text("SECRET=123")
-    (tmp_path / "uv.lock").write_text("lock")  # Create uv.lock file
+    (tmp_path / "uv.lock").write_text("lock")
 
     # Create workspace with custom ignore config
     workspace = Workspace(
@@ -532,10 +532,14 @@ def test_custom_ignore_patterns(tmp_path: Path) -> None:
         ignore=WorkspaceIgnore(
             enabled=True,
             patterns={
-                "locks": ["custom.lock", "special.lock"],  # Override default locks
+                "default": [
+                    "custom.lock",
+                    "special.lock",
+                    ".env",
+                ],  # Override default patterns
             },
             additional=["extra.ignore"],  # Add custom pattern
-            categories=["locks", "dependencies"],  # Only use these categories
+            categories=["default"],  # Use only default category
         ),
         groups=[
             Group(
@@ -562,6 +566,6 @@ def test_custom_ignore_patterns(tmp_path: Path) -> None:
 
     # Verify custom ignore patterns
     assert "src/main.py" in paths  # Should include
-    assert "custom.lock" not in paths  # Should ignore (custom lock)
-    assert ".env" not in paths  # Should ignore (from dependencies category)
-    assert "uv.lock" in paths  # Should include (not in custom locks)
+    assert "custom.lock" not in paths  # Should ignore (custom pattern)
+    assert ".env" not in paths  # Should ignore (custom pattern)
+    assert "uv.lock" in paths  # Should include (not in patterns)
