@@ -457,3 +457,146 @@ def test_git_username_error_handling(tmp_path: Path, runner: CliRunner) -> None:
         content = pyproject_path.read_text()
         assert 'homepage = "https://github.com/username/test_proj"' in content
         assert 'repository = "https://github.com/username/test_proj"' in content
+
+
+def test_git_clean_state(tmp_path: Path, runner: CliRunner) -> None:
+    """Test that Git repository is clean after initialization"""
+    with (
+        runner.isolated_filesystem(temp_dir=tmp_path) as fs,
+        patch("subprocess.run") as mock_run,
+    ):
+        # Create a mock that tracks all commands
+        all_commands: list[list[str]] = []
+
+        def mock_subprocess(*args: Any, **_: Any) -> subprocess.CompletedProcess[str]:
+            cmd = args[0]
+            if isinstance(cmd, list):
+                all_commands.append(cmd)  # Track all commands
+                if cmd[0] == "git":
+                    # Return appropriate responses for different Git commands
+                    if cmd[1] == "--version":
+                        return subprocess.CompletedProcess(
+                            args=cmd, returncode=0, stdout="git version 2.34.1"
+                        )
+                    elif cmd[1] == "config":
+                        return subprocess.CompletedProcess(
+                            args=cmd, returncode=0, stdout="Test User\n"
+                        )
+                    elif cmd[1] == "status":
+                        return subprocess.CompletedProcess(
+                            args=cmd,
+                            returncode=0,
+                            stdout="nothing to commit, working tree clean",
+                        )
+                elif cmd[0] == "uv":
+                    return subprocess.CompletedProcess(
+                        args=cmd, returncode=0, stdout=""
+                    )
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="")
+
+        mock_run.side_effect = mock_subprocess
+
+        # Initialize project
+        result = runner.invoke(app, ["init", "test-proj"])
+        assert result.exit_code == 0
+        project_path = Path(fs) / "test-proj"
+        assert project_path.exists()
+
+        # Find command indices
+        git_init_index = next(
+            i
+            for i, cmd in enumerate(all_commands)
+            if cmd[0] == "git" and cmd[1] == "init"
+        )
+
+        uv_add_indices = [
+            i
+            for i, cmd in enumerate(all_commands)
+            if cmd[0] == "uv" and cmd[1] == "add"
+        ]
+
+        # There should be at least one uv add command
+        assert uv_add_indices, "No uv add commands found"
+
+        # The last uv add command should be before git init
+        last_uv_add_index = uv_add_indices[-1]
+
+        # Debug output
+        if not last_uv_add_index < git_init_index:
+            print("\nCommand sequence:")
+            for i, cmd in enumerate(all_commands):
+                print(f"{i}: {cmd}")
+            print(f"\nuv add indices: {uv_add_indices}")
+            print(f"git init index: {git_init_index}")
+
+        assert last_uv_add_index < git_init_index, (
+            "Dev dependencies should be installed before Git initialization\n"
+            f"Last uv add at index {last_uv_add_index}, "
+            f"git init at index {git_init_index}"
+        )
+
+        # Verify Git commands after init
+        git_commands = [
+            cmd
+            for cmd in all_commands[git_init_index:]
+            if cmd[0] == "git" and cmd[1] != "--version"
+        ]
+
+        expected_git_sequence = [
+            ["git", "init", "--quiet"],
+            ["git", "add", "."],
+            ["git", "commit", "--quiet", "-m", "Initial commit ✨"],
+        ]
+
+        assert len(git_commands) == len(expected_git_sequence), (
+            f"Expected {len(expected_git_sequence)} Git commands after init, "
+            f"got {len(git_commands)}: {git_commands}"
+        )
+
+        for i, (expected, actual) in enumerate(
+            zip(expected_git_sequence, git_commands, strict=False)
+        ):
+            assert expected == actual, (
+                f"Git command mismatch at position {i}:\n"
+                f"Expected: {expected}\n"
+                f"Got: {actual}"
+            )
+
+
+def test_git_init_after_deps(tmp_path: Path, runner: CliRunner) -> None:
+    """Test that Git initialization happens after dependency installation"""
+    with (
+        runner.isolated_filesystem(temp_dir=tmp_path) as fs,
+        patch("subprocess.run") as mock_run,
+    ):
+        # Track command execution order
+        command_order: list[str] = []
+
+        def mock_subprocess(*args: Any, **_: Any) -> subprocess.CompletedProcess[str]:
+            cmd = args[0]
+            if isinstance(cmd, list):
+                if cmd[0] == "git" and cmd[1] == "init":
+                    command_order.append("git_init")
+                elif cmd[0] == "uv" and cmd[1] == "add":
+                    command_order.append("uv_add")
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="")
+
+        mock_run.side_effect = mock_subprocess
+
+        # Initialize project
+        result = runner.invoke(app, ["init", "test-proj"])
+        assert result.exit_code == 0
+
+        # Verify project directory exists
+        project_path = Path(fs) / "test-proj"
+        assert project_path.exists()
+
+        # Verify uv add was called before git init
+        assert "uv_add" in command_order, "Dependencies should be installed"
+        assert "git_init" in command_order, "Git should be initialized"
+
+        uv_index = command_order.index("uv_add")
+        git_index = command_order.index("git_init")
+        assert (
+            uv_index < git_index
+        ), "Dependencies should be installed before Git initialization"

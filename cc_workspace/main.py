@@ -761,7 +761,7 @@ codecompanion-workspace.json
         if not self.base_path.exists():
             self.base_path.mkdir(parents=True)
 
-        # Get Git username
+        # Get Git username for pyproject.toml
         git_username = self._get_git_username()
 
         # Project dirs
@@ -803,8 +803,22 @@ codecompanion-workspace.json
             )
         )
 
-        self._init_git()
-        self._install_dev_tools()
+        # Install dev tools first, before Git initialization
+        try:
+            self._install_dev_tools()
+        except Exception as e:
+            console.print(
+                f"[yellow]Warning: Failed to install dev dependencies: {e}[/yellow]"
+            )
+            return
+
+        # Initialize git last, after all files are created and deps installed
+        try:
+            self._init_git()
+        except Exception as e:
+            console.print(
+                f"[yellow]Warning: Failed to initialize git repository: {e}[/yellow]"
+            )
 
 
 @app.command()
