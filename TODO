@@ -1,0 +1,4 @@
+- Add git hooks in the project default scafolding
+- Remove missing files from yaml config when re-compiling (ask user)
+- We should use wildcards in .cc/...yaml config, because otherwise, i (i-user) shold modify this file each time i change files in project? tests/test_basic.py -> tests/**/*
+- actually, for some reason in my (i - user) .cc/yaml config this doesn't work when i set a wildcard 'test/**/*' and then recompile config and there are no tests in the final json config. also, better to keep wildcards for tests and project files in the default yaml (which is created by default in .cc)

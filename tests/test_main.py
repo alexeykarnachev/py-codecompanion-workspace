@@ -1,6 +1,8 @@
+import json
 from pathlib import Path
 
 import pytest
+from loguru import logger
 from typer.testing import CliRunner
 
 from cc_workspace.main import File, Group, Workspace, WorkspaceIgnore, app
@@ -526,3 +528,149 @@ def test_custom_ignore_patterns(tmp_path: Path) -> None:
     assert "custom.lock" not in paths  # Should ignore (custom pattern)
     assert ".env" not in paths  # Should ignore (custom pattern)
     assert "uv.lock" in paths  # Should include (not in patterns)
+
+
+def test_wildcard_patterns_in_config(tmp_path: Path, runner: CliRunner) -> None:
+    """Test that wildcard patterns in config are properly resolved"""
+    with runner.isolated_filesystem(temp_dir=tmp_path) as _:
+        # Create test structure
+        test_dir = tmp_path / "tests"
+        src_dir = tmp_path / "src"
+        test_dir.mkdir()
+        src_dir.mkdir()
+
+        # Create multiple test files
+        (test_dir / "test_one.py").write_text("def test_1(): pass")
+        (test_dir / "test_two.py").write_text("def test_2(): pass")
+        (test_dir / "nested").mkdir()
+        (test_dir / "nested/test_three.py").write_text("def test_3(): pass")
+
+        # Create source files
+        (src_dir / "main.py").write_text("print('hello')")
+        (src_dir / "utils").mkdir()
+        (src_dir / "utils/helpers.py").write_text("def helper(): pass")
+
+        # Print directory structure
+        print("\nActual directory structure:")
+        for path in sorted(tmp_path.rglob("*")):
+            if path.is_file():
+                print(f"  {path.relative_to(tmp_path)}")
+
+        yaml_content = """
+name: test-project
+description: Test project
+groups:
+  - name: All
+    description: All project files
+    files:
+      - path: "tests/**/*.py"
+        description: "Test files"
+        kind: "pattern"
+      - path: "src/**/*.py"
+        description: "Source files"
+        kind: "pattern"
+"""
+        cc_dir = tmp_path / ".cc"
+        cc_dir.mkdir()
+        config_path = cc_dir / "codecompanion.yaml"
+        config_path.write_text(yaml_content)
+
+        # Compile config
+        result = runner.invoke(app, ["compile-config", str(config_path)])
+        assert result.exit_code == 0
+
+        # Check JSON output
+        with open(tmp_path / "codecompanion-workspace.json") as f:
+            data = json.loads(f.read())
+            files = {f["path"] for g in data["groups"] for f in g["files"]}
+
+            print("\nFiles found in workspace.json:")
+            for found_file in sorted(files):
+                print(f"  {found_file}")
+
+            # Verify all test files are included
+            assert "tests/test_one.py" in files
+            assert "tests/test_two.py" in files
+            assert "tests/nested/test_three.py" in files
+
+
+def test_glob_pattern_variations(tmp_path: Path, runner: CliRunner) -> None:
+    """Test various glob pattern formats"""
+    # Enable trace logging for this test
+    logger.remove()
+    logger.add(
+        lambda msg: print(msg, end=""),
+        level="TRACE",
+        format="<level>{message}</level>",
+    )
+
+    try:
+        # Create test structure
+        (tmp_path / "tests/a/b/c").mkdir(parents=True)
+        (tmp_path / "tests/test_root.py").write_text("test")
+        (tmp_path / "tests/a/test_a.py").write_text("test")
+        (tmp_path / "tests/a/b/test_b.py").write_text("test")
+        (tmp_path / "tests/a/b/c/test_c.py").write_text("test")
+
+        test_cases = [
+            (
+                "tests/**/*.py",  # Standard recursive
+                {
+                    "tests/test_root.py",
+                    "tests/a/test_a.py",
+                    "tests/a/b/test_b.py",
+                    "tests/a/b/c/test_c.py",
+                },
+            ),
+            (
+                "**/test_*.py",  # Any depth test files
+                {
+                    "tests/test_root.py",
+                    "tests/a/test_a.py",
+                    "tests/a/b/test_b.py",
+                    "tests/a/b/c/test_c.py",
+                },
+            ),
+            (
+                "tests/a/**/*.py",  # Nested with prefix
+                {"tests/a/test_a.py", "tests/a/b/test_b.py", "tests/a/b/c/test_c.py"},
+            ),
+            ("tests/*/test_*.py", {"tests/a/test_a.py"}),  # Single level wildcard
+        ]
+
+        for pattern, expected_files in test_cases:
+            logger.debug(f"\nTesting pattern: {pattern}")
+            yaml_content = f"""
+name: test-project
+groups:
+  - name: Tests
+    files:
+      - path: "{pattern}"
+        kind: "pattern"
+"""
+            cc_dir = tmp_path / ".cc"
+            cc_dir.mkdir(exist_ok=True)
+            config_path = cc_dir / "codecompanion.yaml"
+            config_path.write_text(yaml_content)
+
+            result = runner.invoke(app, ["compile-config", str(config_path)])
+            assert result.exit_code == 0
+
+            with open(tmp_path / "codecompanion-workspace.json") as f:
+                data = json.loads(f.read())
+                files = {f["path"] for g in data["groups"] for f in g["files"]}
+
+                logger.debug(f"Expected files: {expected_files}")
+                logger.debug(f"Found files: {files}")
+
+                assert (
+                    files == expected_files
+                ), f"Pattern {pattern} failed to match expected files"
+    finally:
+        # Reset logging after test
+        logger.remove()
+        logger.add(
+            lambda msg: print(msg, end=""),
+            level="WARNING",
+            format="<level>{message}</level>",
+        )

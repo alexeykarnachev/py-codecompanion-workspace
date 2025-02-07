@@ -8,10 +8,20 @@ from typing import Any, ClassVar, Literal
 
 import typer
 import yaml
+from loguru import logger
 from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.progress import Progress, TextColumn
 from rich.prompt import Confirm
+
+# Remove default logger and set production level
+logger.remove()
+logger.add(
+    lambda msg: print(msg, end=""),
+    level="WARNING",
+    format="<level>{message}</level>",
+)
+
 
 app = typer.Typer()
 console = Console()
@@ -153,50 +163,82 @@ class File(BaseModel):
     def resolve(self, base_path: Path) -> list["File"]:
         """Resolve pattern into actual files"""
         if self.kind == "pattern":
-            resolved = []
-            try:
-                # Handle different glob patterns
-                if "**" in self.path:
-                    paths = base_path.rglob(self.path.replace("**/", ""))
-                else:
-                    paths = base_path.glob(self.path)
-
-                # Process found paths
-                for path in sorted(paths):
-                    if not path.is_file():
-                        continue
-
-                    rel_path = str(path.relative_to(base_path))
-
-                    # Skip empty files
-                    if path.stat().st_size == 0:
-                        continue
-
-                    # Skip ignored paths
-                    if self.should_ignore(rel_path):
-                        continue
-
-                    resolved.append(
-                        File(
-                            path=rel_path,
-                            description=self.description,
-                            kind="file",
-                        )
-                    )
-            except Exception as e:
-                print(f"Error resolving pattern {self.path}: {e}")
-                return []
-
-            return resolved
+            return self._resolve_pattern(base_path)
         else:
-            # For explicit files, check if they should be ignored
-            path = base_path / self.path
-            if path.is_file() and path.stat().st_size > 0:
+            return self._resolve_explicit_file(base_path)
+
+    def _resolve_pattern(self, base_path: Path) -> list["File"]:
+        """Resolve pattern into actual files"""
+        resolved = []
+        try:
+            # Normalize pattern to use forward slashes
+            pattern = self.path.replace("\\", "/")
+            logger.trace(f"Resolving pattern '{pattern}' in {base_path}")
+            paths = self._get_paths_for_pattern(pattern, base_path)
+
+            # Process found paths
+            for path in sorted(paths):
+                if not path.is_file():
+                    continue
+
                 rel_path = str(path.relative_to(base_path))
+
+                # Skip empty files
+                if path.stat().st_size == 0:
+                    logger.trace(f"Skipping empty file: {rel_path}")
+                    continue
+
+                # Skip ignored paths
                 if self.should_ignore(rel_path):
-                    return []
-                return [self]
+                    logger.trace(f"Skipping ignored path: {rel_path}")
+                    continue
+
+                logger.trace(f"Adding file: {rel_path}")
+                resolved.append(
+                    File(
+                        path=rel_path,
+                        description=self.description,
+                        kind="file",
+                    )
+                )
+        except Exception as e:
+            logger.error(f"Error resolving pattern {self.path}: {e}")
             return []
+
+        return resolved
+
+    def _get_paths_for_pattern(self, pattern: str, base_path: Path) -> list[Path]:
+        """Get paths for a given pattern"""
+        if "**" in pattern:
+            if pattern.startswith("**/"):
+                # Global recursive search
+                final_pattern = pattern.split("/")[-1]
+                logger.trace(f"Global recursive search for {final_pattern}")
+                return list(base_path.rglob(final_pattern))
+            else:
+                # Path-specific recursive search
+                base_part = pattern.split("**/")[0].rstrip("/")
+                final_pattern = pattern.split("**/")[1].lstrip("/")
+                search_dir = base_path / base_part if base_part else base_path
+                logger.trace(
+                    f"Path-specific recursive search in {search_dir} "
+                    f"for {final_pattern}"
+                )
+                return list(search_dir.rglob(final_pattern))
+        else:
+            # For simple patterns, use glob
+            logger.trace(f"Simple glob for {pattern}")
+            return list(base_path.glob(pattern))
+
+    def _resolve_explicit_file(self, base_path: Path) -> list["File"]:
+        """Resolve explicit file reference"""
+        path = base_path / self.path
+        if path.is_file() and path.stat().st_size > 0:
+            rel_path = str(path.relative_to(base_path))
+            if self.should_ignore(rel_path):
+                return []
+            return [self]
+        return []
 
 
 class Group(BaseModel):
