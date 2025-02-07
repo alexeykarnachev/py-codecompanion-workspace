@@ -366,3 +366,27 @@ def test_ignore_pattern_interaction(complex_project: Path, runner: CliRunner) ->
                 f"Expected: {sorted(case['expected'])}\n"
                 f"Found: {sorted(found_files)}"
             )
+
+
+def test_init_preserves_patterns(complex_project: Path, runner: CliRunner) -> None:
+    """Test that initialization preserves wildcards in yaml config"""
+    with runner.isolated_filesystem(temp_dir=complex_project) as fs:
+        # Initialize workspace
+        result = runner.invoke(app, ["init", "."])
+        assert result.exit_code == 0
+
+        # Check that yaml contains patterns, not resolved files
+        yaml_path = Path(fs) / ".cc" / "codecompanion.yaml"
+        with open(yaml_path) as f:
+            config = yaml.safe_load(f)
+
+        # Verify pattern is preserved
+        files = config["groups"][0]["files"]
+        assert any(
+            f["path"] == "**/*" and f["kind"] == "pattern" for f in files
+        ), "Wildcard pattern should be preserved in yaml config"
+
+        # Verify only CONVENTIONS.md is listed explicitly
+        explicit_files = [f for f in files if f["kind"] == "file"]
+        assert len(explicit_files) == 1
+        assert explicit_files[0]["path"] == ".cc/data/CONVENTIONS.md"

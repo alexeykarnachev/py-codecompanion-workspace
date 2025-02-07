@@ -418,9 +418,9 @@ def create_workspace(path: Path, template_name: str | None = None) -> tuple[Path
     # Render template and validate
     workspace = template.render(project_name=project_name)
 
-    # Write to file
+    # Write the workspace configuration directly, without resolving patterns
     with open(config_path, "w") as f:
-        yaml.dump(workspace.resolve_patterns(base_path=path), f, sort_keys=False)
+        yaml.dump(workspace.model_dump(), f, sort_keys=False)  # Changed this line
 
     return config_path, cc_dir
 
