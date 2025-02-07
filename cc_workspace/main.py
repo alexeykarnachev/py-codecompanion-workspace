@@ -1,6 +1,6 @@
-import fnmatch
 import importlib.resources
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -9,6 +9,8 @@ from typing import Any, ClassVar, Literal
 import typer
 import yaml
 from loguru import logger
+from pathspec import PathSpec
+from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.progress import Progress, TextColumn
@@ -64,7 +66,7 @@ class File(BaseModel):
     description: str | None = None
     path: str
     kind: Literal["file", "pattern"] = "file"
-    _ignore_patterns: set[str] | None = None
+    _ignore_patterns: PathSpec | None = None
 
     model_config = {
         "arbitrary_types_allowed": True,
@@ -87,10 +89,9 @@ class File(BaseModel):
             "coverage/",
             ".hypothesis/",
             # IDE
-            "*.swp",
-            ".DS_Store",
             ".idea/",
             ".vscode/",
+            "*.swp",
             "*.sublime-*",
             ".project",
             ".settings/",
@@ -124,19 +125,23 @@ class File(BaseModel):
     }
 
     @property
-    def ignore_patterns(self) -> set[str]:
+    def ignore_patterns(self) -> PathSpec:
         """Get ignore patterns, using defaults if not set"""
         if self._ignore_patterns is None:
-            return {
+            patterns = {
                 pattern
                 for patterns in self.DEFAULT_IGNORE_PATTERNS.values()
                 for pattern in patterns
             }
+            self._ignore_patterns = PathSpec.from_lines(GitWildMatchPattern, patterns)
         return self._ignore_patterns
 
     @ignore_patterns.setter
     def ignore_patterns(self, patterns: set[str]) -> None:
-        self._ignore_patterns = patterns
+        """Set custom ignore patterns"""
+        # Convert patterns to list and create new PathSpec
+        pattern_list = list(patterns)
+        self._ignore_patterns = PathSpec.from_lines(GitWildMatchPattern, pattern_list)
 
     def should_ignore(self, path: str) -> bool:
         """Check if path matches any ignore pattern"""
@@ -145,20 +150,17 @@ class File(BaseModel):
             return False
 
         # Normalize path
-        path = str(path)
+        path = str(path).replace("\\", "/")
         if path.startswith("./"):
             path = path[2:]
 
-        # Check for dot directories in path parts
+        # Check for dot files/directories
         path_parts = Path(path).parts
         if any(part.startswith(".") for part in path_parts):
             return True
 
         # For patterns, check other ignore rules
-        return any(
-            fnmatch.fnmatch(path, pattern) if "*" in pattern else pattern in path
-            for pattern in self.ignore_patterns
-        )
+        return self.ignore_patterns.match_file(path)
 
     def resolve(self, base_path: Path) -> list["File"]:
         """Resolve pattern into actual files"""
@@ -168,67 +170,54 @@ class File(BaseModel):
             return self._resolve_explicit_file(base_path)
 
     def _resolve_pattern(self, base_path: Path) -> list["File"]:
-        """Resolve pattern into actual files"""
+        """Resolve pattern into actual files using pathspec"""
         resolved = []
         try:
-            # Normalize pattern to use forward slashes
-            pattern = self.path.replace("\\", "/")
-            logger.trace(f"Resolving pattern '{pattern}' in {base_path}")
-            paths = self._get_paths_for_pattern(pattern, base_path)
+            # Normalize pattern by removing consecutive slashes
+            normalized_pattern = re.sub(r"/+", "/", self.path)
+            # Create pattern spec for file matching
+            pattern_spec = PathSpec.from_lines(
+                GitWildMatchPattern, [normalized_pattern]
+            )
 
-            # Process found paths
-            for path in sorted(paths):
-                if not path.is_file():
-                    continue
+            # Get all files in base path
+            all_files = []
+            for root, _, files in os.walk(base_path):
+                for file in files:
+                    file_path = Path(root) / file
+                    rel_path = str(file_path.relative_to(base_path))
+                    all_files.append(rel_path)
 
-                rel_path = str(path.relative_to(base_path))
+            # Filter files using pattern
+            matched_files = pattern_spec.match_files(all_files)
+
+            for path in sorted(str(p) for p in matched_files):
+                full_path = base_path / path
 
                 # Skip empty files
-                if path.stat().st_size == 0:
-                    logger.trace(f"Skipping empty file: {rel_path}")
+                if full_path.stat().st_size == 0:
+                    logger.trace(f"Skipping empty file: {path}")
                     continue
 
                 # Skip ignored paths
-                if self.should_ignore(rel_path):
-                    logger.trace(f"Skipping ignored path: {rel_path}")
+                if self.should_ignore(str(path)):
+                    logger.trace(f"Skipping ignored path: {path}")
                     continue
 
-                logger.trace(f"Adding file: {rel_path}")
+                logger.trace(f"Adding file: {path}")
                 resolved.append(
                     File(
-                        path=rel_path,
+                        path=str(path),
                         description=self.description,
                         kind="file",
                     )
                 )
+
         except Exception as e:
             logger.error(f"Error resolving pattern {self.path}: {e}")
             return []
 
         return resolved
-
-    def _get_paths_for_pattern(self, pattern: str, base_path: Path) -> list[Path]:
-        """Get paths for a given pattern"""
-        if "**" in pattern:
-            if pattern.startswith("**/"):
-                # Global recursive search
-                final_pattern = pattern.split("/")[-1]
-                logger.trace(f"Global recursive search for {final_pattern}")
-                return list(base_path.rglob(final_pattern))
-            else:
-                # Path-specific recursive search
-                base_part = pattern.split("**/")[0].rstrip("/")
-                final_pattern = pattern.split("**/")[1].lstrip("/")
-                search_dir = base_path / base_part if base_part else base_path
-                logger.trace(
-                    f"Path-specific recursive search in {search_dir} "
-                    f"for {final_pattern}"
-                )
-                return list(search_dir.rglob(final_pattern))
-        else:
-            # For simple patterns, use glob
-            logger.trace(f"Simple glob for {pattern}")
-            return list(base_path.glob(pattern))
 
     def _resolve_explicit_file(self, base_path: Path) -> list["File"]:
         """Resolve explicit file reference"""
@@ -288,16 +277,10 @@ class Workspace(BaseModel):
 
         # Add patterns from enabled categories
         for category in self.ignore.categories:
-            if category in File.DEFAULT_IGNORE_PATTERNS:
+            if category in self.ignore.patterns:
+                patterns.update(self.ignore.patterns[category])
+            elif category in File.DEFAULT_IGNORE_PATTERNS:
                 patterns.update(File.DEFAULT_IGNORE_PATTERNS[category])
-
-        # Override with custom patterns
-        for category, custom_patterns in self.ignore.patterns.items():
-            if category in File.DEFAULT_IGNORE_PATTERNS:
-                # Remove default patterns for this category
-                patterns.difference_update(File.DEFAULT_IGNORE_PATTERNS[category])
-                # Add custom patterns
-                patterns.update(custom_patterns)
 
         # Add additional patterns
         patterns.update(self.ignore.additional)
@@ -306,6 +289,15 @@ class Workspace(BaseModel):
 
     def resolve_patterns(self, base_path: Path) -> dict[str, Any]:
         """Resolve patterns in all groups"""
+        # Get ignore patterns first
+        ignore_patterns = self.get_ignore_patterns()
+        pattern_spec = PathSpec.from_lines(GitWildMatchPattern, list(ignore_patterns))
+
+        # Update ignore patterns for all files
+        for group in self.groups:
+            for file in group.files:
+                file._ignore_patterns = pattern_spec  # Set directly to avoid conversion
+
         data = {
             "name": self.name,
             "description": self.description,

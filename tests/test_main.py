@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 from loguru import logger
+from pathspec import PathSpec
+from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 from typer.testing import CliRunner
 
 from cc_workspace.main import File, Group, Workspace, WorkspaceIgnore, app
@@ -514,10 +516,12 @@ def test_custom_ignore_patterns(tmp_path: Path) -> None:
     # Resolve patterns
     ignore_patterns = workspace.get_ignore_patterns()
 
-    # Update patterns for files
+    # Update patterns for files - convert set to PathSpec
     for group in workspace.groups:
         for file in group.files:
-            file.ignore_patterns = ignore_patterns
+            file._ignore_patterns = PathSpec.from_lines(
+                GitWildMatchPattern, list(ignore_patterns)
+            )
 
     # Test pattern resolution
     resolved = workspace.groups[0].resolve_patterns(tmp_path)

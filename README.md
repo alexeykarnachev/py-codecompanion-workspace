@@ -73,10 +73,41 @@ ccw compile-config --help
 
 ## Configuration
 
-1. Edit `.cc/codecompanion.yaml` to configure your workspace
-2. Run `ccw compile-config .cc/codecompanion.yaml` to update
-3. Use the generated `codecompanion-workspace.json` in Neovim
+The workspace configuration is stored in `.cc/codecompanion.yaml`. Here's an example:
+
+```yaml
+name: "my-project"
+description: "Project description"
+system_prompt: "Custom system prompt for LLM interactions"
+ignore:
+  enabled: true
+  patterns:
+    default: ["*.lock", ".env"]
+  additional: ["custom.ignore"]
+  categories: ["default"]
+groups:
+  - name: "Core"
+    description: "Core project files"
+    files:
+      - path: "{package_name}/**/*.py"
+        description: "Source files"
+        kind: "pattern"
+      - path: "tests/**/*.py"
+        description: "Test files"
+        kind: "pattern"
+```
+
+Key features:
+- Pattern-based file discovery with `**/*` glob support
+- Customizable ignore patterns
+- File grouping for better organization
+- Custom system prompts per group
+
+After modifying the config:
+1. Run `ccw compile-config .cc/codecompanion.yaml`
+2. Use the generated `codecompanion-workspace.json` in Neovim
 
 ## License
 
 [MIT](LICENSE)
+
