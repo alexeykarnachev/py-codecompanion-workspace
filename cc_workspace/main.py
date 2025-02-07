@@ -508,8 +508,8 @@ dependencies = [
 ]
 
 [project.urls]
-homepage = "https://github.com/username/{package_name}"
-repository = "https://github.com/username/{package_name}"
+homepage = "https://github.com/{git_username}/{package_name}"
+repository = "https://github.com/{git_username}/{package_name}"
 
 [build-system]
 requires = ["hatchling"]
@@ -632,6 +632,29 @@ codecompanion-workspace.json
         self.project_name = project_name or path.name
         self.package_name = to_package_name(self.project_name)
 
+    def _get_git_username(self) -> str:
+        """Get Git username from config or return 'username'"""
+        try:
+            # First check if git is available
+            subprocess.run(
+                ["git", "--version"],
+                check=True,
+                capture_output=True,
+            )
+
+            # Then try to get username
+            result = subprocess.run(
+                ["git", "config", "user.name"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            username = result.stdout.strip()
+            # Convert to lowercase and remove spaces/special chars for URL
+            return re.sub(r"[^a-zA-Z0-9]", "", username.lower())
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return "username"
+
     def _init_git(self) -> None:
         """Initialize git repository"""
         try:
@@ -676,6 +699,9 @@ codecompanion-workspace.json
         if not self.base_path.exists():
             self.base_path.mkdir(parents=True)
 
+        # Get Git username
+        git_username = self._get_git_username()
+
         # Project dirs
         pkg_dir = self.base_path / self.package_name
         test_dir = self.base_path / "tests"
@@ -706,10 +732,13 @@ codecompanion-workspace.json
         )
         check_script.chmod(0o755)  # Make executable
 
-        # Create pyproject.toml
+        # Create pyproject.toml with Git username
         pyproject = self.base_path / "pyproject.toml"
         pyproject.write_text(
-            self.PYPROJECT_CONTENT.format(package_name=self.package_name)
+            self.PYPROJECT_CONTENT.format(
+                package_name=self.package_name,
+                git_username=git_username,
+            )
         )
 
         # Initialize git repository

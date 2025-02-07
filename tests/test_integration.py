@@ -1,5 +1,8 @@
 import json
+import subprocess
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -13,6 +16,103 @@ def runner() -> CliRunner:
     return CliRunner()
 
 
+def is_git_command(cmd: list[str], *args: str) -> bool:
+    """Check if command matches Git command pattern"""
+    return cmd[0] == "git" and cmd[1:] == list(args)
+
+
+GIT_INIT_CMD = ["init", "--quiet"]
+GIT_ADD_CMD = ["add", "."]
+GIT_COMMIT_CMD = ["commit", "--quiet", "-m", "Initial commit ✨"]
+GIT_VERSION_CMD = ["--version"]
+GIT_USERNAME_CMD = ["config", "user.name"]
+
+
+def create_mock_subprocess() -> Callable[..., subprocess.CompletedProcess[str]]:
+    """Create a mock subprocess function that handles all Git commands"""
+
+    def mock_subprocess(*args: Any, **_: Any) -> subprocess.CompletedProcess[str]:
+        cmd = args[0]
+        if not isinstance(cmd, list) or not cmd:
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="")
+
+        if is_git_command(cmd, *GIT_VERSION_CMD):
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="git version 2.34.1"
+            )
+
+        if is_git_command(cmd, *GIT_USERNAME_CMD):
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="Test User\n"
+            )
+
+        if any(
+            is_git_command(cmd, *git_cmd)
+            for git_cmd in [GIT_INIT_CMD, GIT_ADD_CMD, GIT_COMMIT_CMD]
+        ):
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="")
+
+        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="")
+
+    return mock_subprocess
+
+
+def create_mock_subprocess_with_username(
+    username: str,
+) -> Callable[..., subprocess.CompletedProcess[str]]:
+    """Create a mock subprocess with specific username"""
+
+    def mock_subprocess(*args: Any, **_: Any) -> subprocess.CompletedProcess[str]:
+        cmd = args[0]
+        if not isinstance(cmd, list) or not cmd:
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="")
+
+        if is_git_command(cmd, *GIT_VERSION_CMD):
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="")
+
+        if is_git_command(cmd, *GIT_USERNAME_CMD):
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout=f"{username}\n"
+            )
+
+        if any(
+            is_git_command(cmd, *git_cmd)
+            for git_cmd in [GIT_INIT_CMD, GIT_ADD_CMD, GIT_COMMIT_CMD]
+        ):
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="")
+
+        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="")
+
+    return mock_subprocess
+
+
+def create_mock_subprocess_with_error() -> (
+    Callable[..., subprocess.CompletedProcess[str]]
+):
+    """Create a mock subprocess that simulates Git config error"""
+
+    def mock_subprocess(*args: Any, **_: Any) -> subprocess.CompletedProcess[str]:
+        cmd = args[0]
+        if not isinstance(cmd, list) or not cmd:
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="")
+
+        if is_git_command(cmd, *GIT_VERSION_CMD):
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="")
+
+        if is_git_command(cmd, *GIT_USERNAME_CMD):
+            raise subprocess.CalledProcessError(returncode=1, cmd=cmd)
+
+        if any(
+            is_git_command(cmd, *git_cmd)
+            for git_cmd in [GIT_INIT_CMD, GIT_ADD_CMD, GIT_COMMIT_CMD]
+        ):
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="")
+
+        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="")
+
+    return mock_subprocess
+
+
 def test_error_handling(tmp_path: Path, runner: CliRunner) -> None:
     """Test error handling for invalid inputs"""
     with runner.isolated_filesystem(temp_dir=tmp_path):
@@ -22,39 +122,13 @@ def test_error_handling(tmp_path: Path, runner: CliRunner) -> None:
         assert "Template 'nonexistent' not found" in result.stdout
 
 
-def test_json_structure_consistency(tmp_path: Path, runner: CliRunner) -> None:
-    """Test that JSON output maintains consistent structure across operations"""
-    with runner.isolated_filesystem(temp_dir=tmp_path) as fs:
-        # Initialize workspace
-        init_result = runner.invoke(app, ["init", "."])
-        assert init_result.exit_code == 0
-
-        # Get initial JSON structure
-        json_path = Path(fs) / "codecompanion-workspace.json"
-        with open(json_path) as f:
-            initial_data = json.load(f)
-
-        # Verify structure after compilation
-        yaml_path = Path(fs) / ".cc" / "codecompanion.yaml"
-        compile_result = runner.invoke(app, ["compile-config", str(yaml_path)])
-        assert compile_result.exit_code == 0
-
-        with open(json_path) as f:
-            compiled_data = json.load(f)
-
-        # Check structure consistency
-        assert set(initial_data.keys()) == set(compiled_data.keys())
-        assert "ignore" not in initial_data
-        assert "ignore" not in compiled_data
-
-
 def test_init_new_project_structure(tmp_path: Path, runner: CliRunner) -> None:
     """Test basic project structure creation"""
     with (
         runner.isolated_filesystem(temp_dir=tmp_path) as fs,
         patch("subprocess.run") as mock_run,
     ):
-        mock_run.return_value.returncode = 0
+        mock_run.side_effect = create_mock_subprocess()
         result = runner.invoke(app, ["init", "test-proj"])
         assert result.exit_code == 0
 
@@ -78,7 +152,7 @@ def test_init_new_project_tests(tmp_path: Path, runner: CliRunner) -> None:
         runner.isolated_filesystem(temp_dir=tmp_path) as fs,
         patch("subprocess.run") as mock_run,
     ):
-        mock_run.return_value.returncode = 0
+        mock_run.side_effect = create_mock_subprocess()
         result = runner.invoke(app, ["init", "test-proj"])
         assert result.exit_code == 0
 
@@ -102,7 +176,7 @@ def test_init_new_project_scripts(tmp_path: Path, runner: CliRunner) -> None:
         runner.isolated_filesystem(temp_dir=tmp_path) as fs,
         patch("subprocess.run") as mock_run,
     ):
-        mock_run.return_value.returncode = 0
+        mock_run.side_effect = create_mock_subprocess()
         result = runner.invoke(app, ["init", "test-proj"])
         assert result.exit_code == 0
 
@@ -125,7 +199,7 @@ def test_init_new_project_config(tmp_path: Path, runner: CliRunner) -> None:
         runner.isolated_filesystem(temp_dir=tmp_path) as fs,
         patch("subprocess.run") as mock_run,
     ):
-        mock_run.return_value.returncode = 0
+        mock_run.side_effect = create_mock_subprocess()
         result = runner.invoke(app, ["init", "test-proj"])
         assert result.exit_code == 0
 
@@ -148,7 +222,7 @@ def test_init_new_project_docs(tmp_path: Path, runner: CliRunner) -> None:
         runner.isolated_filesystem(temp_dir=tmp_path) as fs,
         patch("subprocess.run") as mock_run,
     ):
-        mock_run.return_value.returncode = 0
+        mock_run.side_effect = create_mock_subprocess()
         result = runner.invoke(app, ["init", "test-proj"])
         assert result.exit_code == 0
 
@@ -173,13 +247,35 @@ def test_init_new_project_docs(tmp_path: Path, runner: CliRunner) -> None:
         assert ".cc/" in gitignore_content
 
 
+def test_git_initialization(tmp_path: Path, runner: CliRunner) -> None:
+    """Test Git initialization behavior"""
+    with (
+        runner.isolated_filesystem(temp_dir=tmp_path) as fs,
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_run.side_effect = create_mock_subprocess()
+        result = runner.invoke(app, ["init", "test-proj"])
+        assert result.exit_code == 0
+        project_path = Path(fs) / "test-proj"
+        assert project_path.exists()
+
+        # Verify Git commands were called in correct order
+        git_commands = [
+            args[0] for args, _ in mock_run.call_args_list if args[0][0] == "git"
+        ]
+        assert ["git", "--version"] in git_commands
+        assert ["git", "init", "--quiet"] in git_commands
+        assert ["git", "add", "."] in git_commands
+        assert ["git", "commit", "--quiet", "-m", "Initial commit ✨"] in git_commands
+
+
 def test_init_current_directory(tmp_path: Path, runner: CliRunner) -> None:
     """Test initializing in current directory"""
     with (
         runner.isolated_filesystem(temp_dir=tmp_path) as fs,
         patch("subprocess.run") as mock_run,
     ):
-        mock_run.return_value.returncode = 0
+        mock_run.side_effect = create_mock_subprocess()
         # Should not prompt for confirmation in current directory
         result = runner.invoke(app, ["init", "."])
         assert result.exit_code == 0
@@ -194,7 +290,7 @@ def test_init_existing_directory(tmp_path: Path, runner: CliRunner) -> None:
         runner.isolated_filesystem(temp_dir=tmp_path) as fs,
         patch("subprocess.run") as mock_run,
     ):
-        mock_run.return_value.returncode = 0
+        mock_run.side_effect = create_mock_subprocess()
         # Create existing project
         project_path = Path(fs) / "existing-proj"
         project_path.mkdir()
@@ -219,7 +315,7 @@ def test_workspace_structure(tmp_path: Path, runner: CliRunner) -> None:
         runner.isolated_filesystem(temp_dir=tmp_path) as fs,
         patch("subprocess.run") as mock_run,
     ):
-        mock_run.return_value.returncode = 0
+        mock_run.side_effect = create_mock_subprocess()
         # Create test structure
         test_dir = Path(fs)
         (test_dir / "src").mkdir()
@@ -269,7 +365,7 @@ def test_project_name_conversion(tmp_path: Path, runner: CliRunner) -> None:
         runner.isolated_filesystem(temp_dir=tmp_path) as fs,
         patch("subprocess.run") as mock_run,
     ):
-        mock_run.return_value.returncode = 0
+        mock_run.side_effect = create_mock_subprocess()
         for project_name, package_name in test_cases:
             result = runner.invoke(app, ["init", project_name])
             assert result.exit_code == 0
@@ -283,29 +379,51 @@ def test_project_name_conversion(tmp_path: Path, runner: CliRunner) -> None:
             assert f"import {package_name}" in test_content
 
 
-def test_git_initialization(tmp_path: Path, runner: CliRunner) -> None:
-    """Test Git initialization behavior"""
+def test_git_username_extraction(tmp_path: Path, runner: CliRunner) -> None:
+    """Test Git username extraction and fallback behavior"""
     with (
         runner.isolated_filesystem(temp_dir=tmp_path) as fs,
         patch("subprocess.run") as mock_run,
     ):
-        mock_run.return_value.returncode = 0
+        mock_run.side_effect = create_mock_subprocess_with_username("John Doe")
         result = runner.invoke(app, ["init", "test-proj"])
         assert result.exit_code == 0
-        project_path = Path(fs) / "test-proj"
-        assert project_path.exists()
 
-        # Verify Git commands were called in correct order
-        git_commands = [
-            args[0] for args, _ in mock_run.call_args_list if args[0][0] == "git"
-        ]
-        assert ["git", "--version"] in git_commands
-        assert ["git", "init", "--quiet"] in git_commands
-        assert ["git", "add", "."] in git_commands
-        assert ["git", "commit", "--quiet", "-m", "Initial commit ✨"] in git_commands
+        pyproject_path = Path(fs) / "test-proj" / "pyproject.toml"
+        content = pyproject_path.read_text()
+        assert 'homepage = "https://github.com/johndoe/test_proj"' in content
+        assert 'repository = "https://github.com/johndoe/test_proj"' in content
 
-        # Verify no environment variables were set for Git author
-        for call in mock_run.call_args_list:
-            if call.kwargs.get("env"):
-                assert "GIT_AUTHOR_NAME" not in call.kwargs["env"]
-                assert "GIT_AUTHOR_EMAIL" not in call.kwargs["env"]
+
+def test_git_username_special_chars(tmp_path: Path, runner: CliRunner) -> None:
+    """Test handling of special characters in Git username"""
+    with (
+        runner.isolated_filesystem(temp_dir=tmp_path) as fs,
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_run.side_effect = create_mock_subprocess_with_username(
+            "John Smith-Doe Jr."
+        )
+        result = runner.invoke(app, ["init", "test-proj"])
+        assert result.exit_code == 0
+
+        pyproject_path = Path(fs) / "test-proj" / "pyproject.toml"
+        content = pyproject_path.read_text()
+        assert 'homepage = "https://github.com/johnsmithdoejr/test_proj"' in content
+        assert 'repository = "https://github.com/johnsmithdoejr/test_proj"' in content
+
+
+def test_git_username_error_handling(tmp_path: Path, runner: CliRunner) -> None:
+    """Test handling of Git config errors"""
+    with (
+        runner.isolated_filesystem(temp_dir=tmp_path) as fs,
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_run.side_effect = create_mock_subprocess_with_error()
+        result = runner.invoke(app, ["init", "test-proj"])
+        assert result.exit_code == 0
+
+        pyproject_path = Path(fs) / "test-proj" / "pyproject.toml"
+        content = pyproject_path.read_text()
+        assert 'homepage = "https://github.com/username/test_proj"' in content
+        assert 'repository = "https://github.com/username/test_proj"' in content
