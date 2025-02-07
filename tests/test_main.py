@@ -12,24 +12,41 @@ def runner() -> CliRunner:
 
 
 def test_init_command(tmp_path: Path, runner: CliRunner) -> None:
-    result = runner.invoke(app, ["init", str(tmp_path)])
-    assert result.exit_code == 0
-    assert "✨ Initialized workspace" in result.stdout
-    assert (tmp_path / ".cc" / "codecompanion.yaml").exists()
-    assert (tmp_path / "codecompanion-workspace.json").exists()
+    with runner.isolated_filesystem(temp_dir=tmp_path) as fs:
+        result = runner.invoke(app, ["init", "."])
+        assert result.exit_code == 0
+        assert (Path(fs) / ".cc" / "codecompanion.yaml").exists()
+        assert (Path(fs) / "codecompanion-workspace.json").exists()
 
 
 def test_compile_config_command(tmp_path: Path, runner: CliRunner) -> None:
-    # First init
-    init_result = runner.invoke(app, ["init", str(tmp_path)])
-    assert init_result.exit_code == 0
+    with runner.isolated_filesystem(temp_dir=tmp_path) as fs:
+        # First init
+        init_result = runner.invoke(app, ["init", "."])
+        assert init_result.exit_code == 0
 
-    # Then compile config
-    yaml_path = tmp_path / ".cc" / "codecompanion.yaml"
-    result = runner.invoke(app, ["compile-config", str(yaml_path)])
-    assert result.exit_code == 0
-    assert "✨ Compiled workspace config" in result.stdout
-    assert (tmp_path / "codecompanion-workspace.json").exists()
+        # Then compile config
+        yaml_path = Path(fs) / ".cc" / "codecompanion.yaml"
+        result = runner.invoke(app, ["compile-config", str(yaml_path)])
+        assert result.exit_code == 0
+        assert "✨ Compiled workspace config" in result.stdout
+        assert (Path(fs) / "codecompanion-workspace.json").exists()
+
+
+def test_progress_display(tmp_path: Path, runner: CliRunner) -> None:
+    """Test progress indication during compilation"""
+    with runner.isolated_filesystem(temp_dir=tmp_path) as fs:
+        # First init to create valid files
+        init_result = runner.invoke(app, ["init", "."])
+        assert init_result.exit_code == 0
+
+        # Then test compilation output
+        yaml_path = Path(fs) / ".cc" / "codecompanion.yaml"
+        result = runner.invoke(app, ["compile-config", str(yaml_path)])
+        assert result.exit_code == 0
+
+        # Verify success message instead of progress messages since they're transient
+        assert "✨ Compiled workspace config" in result.stdout
 
 
 def test_cli_help(runner: CliRunner) -> None:
@@ -63,21 +80,6 @@ groups:
     assert "Invalid workspace:" in result.stdout
     assert "File not found: nonexistent.py" in result.stdout
     assert "Symbol file not found: also_missing.py" in result.stdout
-
-
-def test_progress_display(tmp_path: Path, runner: CliRunner) -> None:
-    """Test progress indication during compilation"""
-    # First init to create valid files
-    init_result = runner.invoke(app, ["init", str(tmp_path)])
-    assert init_result.exit_code == 0
-
-    # Then test compilation output
-    yaml_path = tmp_path / ".cc" / "codecompanion.yaml"
-    result = runner.invoke(app, ["compile-config", str(yaml_path)])
-    assert result.exit_code == 0
-
-    # Verify success message instead of progress messages since they're transient
-    assert "✨ Compiled workspace config" in result.stdout
 
 
 def test_pattern_resolution(tmp_path: Path) -> None:

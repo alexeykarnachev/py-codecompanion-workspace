@@ -40,6 +40,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "cc-workspace" },
+    { name = "types-aiofiles" },
 ]
 
 [package.metadata]
@@ -58,7 +59,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "cc-workspace", editable = "." }]
+dev = [
+    { name = "cc-workspace", editable = "." },
+    { name = "types-aiofiles", specifier = ">=24.1.0.20241221" },
+]
 
 [[package]]
 name = "click"
@@ -350,6 +354,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/cb/ce/dca7b219718afd37a0068f4f2530a727c2b74a8b6e8e0c0080a4c0de4fcd/typer-0.15.1.tar.gz", hash = "sha256:a0588c0a7fa68a1978a069818657778f86abe6ff5ea6abf472f940a08bfe4f0a", size = 99789 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d0/cc/0a838ba5ca64dc832aa43f727bd586309846b0ffb2ce52422543e6075e8a/typer-0.15.1-py3-none-any.whl", hash = "sha256:7994fb7b8155b64d3402518560648446072864beefd44aa2dc36972a5972e847", size = 44908 },
+]
+
+[[package]]
+name = "types-aiofiles"
+version = "24.1.0.20241221"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ab/5e/f984b9ddc7eecdf31e683e692d933f3672276ed95aad6adb9aea9ecbdc29/types_aiofiles-24.1.0.20241221.tar.gz", hash = "sha256:c40f6c290b0af9e902f7f3fa91213cf5bb67f37086fb21dc0ff458253586ad55", size = 14081 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ff/da/77902220df98ce920444cf3611fa0b1cf0dc2cfa5a137c55e93829aa458e/types_aiofiles-24.1.0.20241221-py3-none-any.whl", hash = "sha256:11d4e102af0627c02e8c1d17736caa3c39de1058bea37e2f4de6ef11a5b652ab", size = 14162 },
 ]
 
 [[package]]

@@ -1,6 +1,7 @@
 import fnmatch
 import importlib.resources
 import json
+import re
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
@@ -9,17 +10,27 @@ import yaml
 from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.progress import Progress, TextColumn
+from rich.prompt import Confirm
 
 app = typer.Typer()
 console = Console()
 
 # CLI Arguments
 INIT_PATH_ARG = typer.Argument(
-    default=Path("."),
-    help="Project path",
-    exists=True,
-    dir_okay=True,
-    file_okay=False,
+    default=".",
+    help="Project path or name. Use '.' for current directory",
+)
+
+INIT_FORCE_OPT = typer.Option(
+    False,
+    "--force",
+    "-f",
+    help="Force overwrite existing files",
+)
+
+INIT_TEMPLATE_OPT = typer.Option(
+    None,
+    help="Template to use",
 )
 
 COMPILE_CONFIG_ARG = typer.Argument(
@@ -401,66 +412,159 @@ def validate_workspace_files(workspace: Workspace, base_path: Path) -> list[str]
     return errors
 
 
-def compile_workspace(config_path: Path, output_path: Path | None = None) -> None:
+def compile_workspace(
+    config_path: Path,
+    output_path: Path | None = None,
+) -> None:
     """Compile YAML to JSON"""
     if not output_path:
         output_path = config_path.parent.parent / "codecompanion-workspace.json"
 
     base_path = config_path.parent.parent
 
-    with Progress(
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-        transient=True,  # This will clear the progress display when done
-    ) as progress:
-        # Read and validate YAML
-        progress.add_task("├─ Reading config...", total=None)
-        with open(config_path) as f:
-            config = yaml.safe_load(f)
+    # Read and validate YAML
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
 
-        progress.add_task("├─ Validating schema...", total=None)
-        workspace = Workspace(**config)
+    workspace = Workspace(**config)
 
-        # Validate files exist
-        progress.add_task("├─ Checking files...", total=None)
-        errors = validate_workspace_files(workspace, config_path.parent.parent)
-        if errors:
-            raise ValueError("\n".join(["Invalid workspace:", *errors]))
+    # Validate files exist
+    errors = validate_workspace_files(workspace, config_path.parent.parent)
+    if errors:
+        raise ValueError("\n".join(["Invalid workspace:", *errors]))
 
-        # Write JSON with resolved patterns
-        progress.add_task("└─ Writing output...", total=None)
-        with open(output_path, "w") as f:
-            data = workspace.resolve_patterns(base_path=base_path)
-            f.write(json.dumps(data, indent=2))
+    # Write JSON with resolved patterns
+    with open(output_path, "w") as f:
+        data = workspace.resolve_patterns(base_path=base_path)
+        f.write(json.dumps(data, indent=2))
+
+
+def to_package_name(name: str) -> str:
+    """Convert project name to valid Python package name"""
+    return re.sub(r"[-.]", "_", name.lower())
+
+
+class ProjectInitializer:
+    """Handles new project initialization"""
+
+    INIT_CONTENT: ClassVar[str] = '__version__ = "0.1.0"\n'
+
+    MAIN_CONTENT: ClassVar[
+        str
+    ] = """def main() -> None:
+    print("Hello, World!")
+
+if __name__ == "__main__":
+    main()
+"""
+
+    TEST_CONTENT: ClassVar[
+        str
+    ] = """def test_version() -> None:
+    import {package_name}
+    assert {package_name}.__version__ == "0.1.0"
+"""
+
+    def __init__(self, path: Path, project_name: str | None = None) -> None:
+        self.base_path = path
+        self.project_name = project_name or path.name
+        self.package_name = to_package_name(self.project_name)
+
+    def create_structure(self) -> None:
+        """Create project directory structure"""
+        # Create base dir if doesn't exist
+        if not self.base_path.exists():
+            self.base_path.mkdir(parents=True)
+
+        # Project dirs
+        pkg_dir = self.base_path / self.package_name
+        test_dir = self.base_path / "tests"
+        script_dir = self.base_path / "scripts"
+
+        for d in [pkg_dir, test_dir, script_dir]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        # Basic files
+        (pkg_dir / "__init__.py").write_text(self.INIT_CONTENT)
+        (pkg_dir / "main.py").write_text(self.MAIN_CONTENT)
+        (test_dir / "__init__.py").touch()
+        (test_dir / "test_basic.py").write_text(
+            self.TEST_CONTENT.format(package_name=self.package_name)
+        )
 
 
 @app.command()
 def init(
     path: Path = INIT_PATH_ARG,
-    template: str = typer.Option(
-        None,
-        help=f"Template to use: {', '.join(TEMPLATES.list_templates())}",
-    ),
-    skip_compile: bool = typer.Option(
-        False,
-        help="Skip compiling to JSON after initialization",
-    ),
+    force: bool = INIT_FORCE_OPT,
+    template: str | None = INIT_TEMPLATE_OPT,
 ) -> None:
-    """Initialize a new CodeCompanion workspace"""
+    """Initialize a new Python project with CodeCompanion workspace"""
     try:
-        # Debug output - make it more concise
-        if template:
-            console.print(f"Using template: {template}")
+        # Combine nested if statements
+        if template is not None and template not in TEMPLATES.list_templates():
+            console.print(f"[red]Error: Template '{template}' not found[/red]")
+            raise typer.Exit(1)
 
-        config_path, cc_dir = create_workspace(path, template)
-        console.print(f"✨ Initialized workspace at {path}")
-        console.print(f"📁 CCW files stored in {cc_dir}")
+        # Handle project path
+        if str(path) == ".":
+            # Just initialize workspace files in current directory
+            project_path = Path.cwd()
+            project_name = None
+            create_project = False
+        else:
+            # Create new project in the specified directory
+            project_path = Path.cwd() / path
+            project_name = path.name
+            create_project = True
 
-        if not skip_compile:
-            compile_workspace(config_path)
-            console.print("✨ Compiled workspace config")
+            # Combine nested if statements
+            if (
+                project_path.exists()
+                and not force
+                and not Confirm.ask(
+                    f"\nDirectory {project_path} already exists. Initialize anyway?",
+                    default=False,
+                )
+            ):
+                raise typer.Exit(0)
+
+        # Create project structure and workspace
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+            transient=True,
+        ) as progress:
+            try:
+                if create_project:
+                    progress.add_task("├─ Creating project structure...", total=None)
+                    initializer = ProjectInitializer(project_path, project_name)
+                    initializer.create_structure()
+
+                # Initialize workspace
+                progress.add_task("├─ Initializing workspace...", total=None)
+                config_path, cc_dir = create_workspace(project_path, template)
+
+                progress.add_task("└─ Compiling workspace config...", total=None)
+                compile_workspace(config_path)
+
+                if create_project:
+                    console.print(f"\n✨ Created new project at {project_path}")
+                    console.print(f"📁 Project files in {project_path}")
+                else:
+                    console.print("\n✨ Initialized workspace in current directory")
+                console.print(f"📁 CCW files in {cc_dir}")
+
+                return  # Success case
+
+            except Exception as e:
+                console.print(f"[red]Error during initialization: {e}[/red]")
+                raise typer.Exit(1) from e
+
+    except typer.Exit:
+        raise
     except Exception as e:
-        console.print(f"[red]Error: {e!s}[/red]")
+        console.print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1) from e
 
 

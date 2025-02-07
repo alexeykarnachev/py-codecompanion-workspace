@@ -56,6 +56,7 @@ cc-workspace = { workspace = true }
 [dependency-groups]
 dev = [
     "cc-workspace",
+    "types-aiofiles>=24.1.0.20241221",
 ]
 
 [tool.pytest.ini_options]

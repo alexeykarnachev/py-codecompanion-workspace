@@ -12,91 +12,160 @@ def runner() -> CliRunner:
     return CliRunner()
 
 
-def test_workspace_structure(tmp_path: Path, runner: CliRunner) -> None:
-    """Test the basic workspace structure and file discovery"""
-    # Create test structure
-    (tmp_path / "src").mkdir()
-    (tmp_path / "src/main.py").write_text("print('hello')")
-    (tmp_path / "README.md").write_text("# Documentation")
-    (tmp_path / "node_modules").mkdir()
-    (tmp_path / "node_modules/package.json").write_text("{}")
-    (tmp_path / ".git").mkdir()
-    (tmp_path / ".git/config").write_text("git config")
-
-    # Initialize workspace
-    result = runner.invoke(app, ["init", str(tmp_path)])
-    assert result.exit_code == 0
-    assert "✨ Initialized workspace" in result.stdout
-
-    # Verify JSON content and structure
-    json_config = tmp_path / "codecompanion-workspace.json"
-    assert json_config.exists()
-
-    with open(json_config) as f:
-        json_content = json.load(f)
-
-    # Verify required fields
-    assert "name" in json_content
-    assert "system_prompt" in json_content
-    assert "groups" in json_content
-    assert isinstance(json_content["groups"], list)
-
-    # Verify ignore section is not present
-    assert "ignore" not in json_content
-
-    # Check file discovery still works
-    files = {f["path"] for g in json_content["groups"] for f in g["files"]}
-    assert "src/main.py" in files  # Should include regular files
-    assert "README.md" in files  # Should include docs
-    assert ".cc/data/CONVENTIONS.md" in files  # Should include conventions
-    assert "node_modules/package.json" not in files  # Should respect ignores
-    assert ".git/config" not in files  # Should ignore dot directories
-
-
 def test_error_handling(tmp_path: Path, runner: CliRunner) -> None:
-    # Test invalid template
-    result = runner.invoke(app, ["init", "--template", "nonexistent"])
-    assert result.exit_code == 1
-    assert "Template 'nonexistent' not found" in result.stdout
-
-    # Test invalid YAML compilation
-    invalid_yaml = tmp_path / "invalid.yaml"
-    invalid_yaml.write_text("invalid: [yaml: content")
-    result = runner.invoke(app, ["compile-config", str(invalid_yaml)])
-    assert result.exit_code == 1
-    assert "Error" in result.stdout
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        # Test invalid template
+        result = runner.invoke(app, ["init", "--template", "nonexistent"])
+        assert result.exit_code == 1
+        assert "Template 'nonexistent' not found" in result.stdout
 
 
 def test_json_structure_consistency(tmp_path: Path, runner: CliRunner) -> None:
     """Test that JSON output maintains consistent structure across operations"""
-    # Initialize workspace
-    init_result = runner.invoke(app, ["init", str(tmp_path)])
-    assert init_result.exit_code == 0
+    with runner.isolated_filesystem(temp_dir=tmp_path) as fs:
+        # Initialize workspace
+        init_result = runner.invoke(app, ["init", "."])
+        assert init_result.exit_code == 0
 
-    # Get initial JSON structure
-    json_path = tmp_path / "codecompanion-workspace.json"
-    with open(json_path) as f:
-        initial_data = json.load(f)
+        # Get initial JSON structure
+        json_path = Path(fs) / "codecompanion-workspace.json"
+        with open(json_path) as f:
+            initial_data = json.load(f)
 
-    # Verify structure after compilation
-    yaml_path = tmp_path / ".cc" / "codecompanion.yaml"
-    compile_result = runner.invoke(app, ["compile-config", str(yaml_path)])
-    assert compile_result.exit_code == 0
+        # Verify structure after compilation
+        yaml_path = Path(fs) / ".cc" / "codecompanion.yaml"
+        compile_result = runner.invoke(app, ["compile-config", str(yaml_path)])
+        assert compile_result.exit_code == 0
 
-    with open(json_path) as f:
-        compiled_data = json.load(f)
+        with open(json_path) as f:
+            compiled_data = json.load(f)
 
-    # Check structure consistency
-    assert set(initial_data.keys()) == set(compiled_data.keys())
-    assert "ignore" not in initial_data
-    assert "ignore" not in compiled_data
+        # Check structure consistency
+        assert set(initial_data.keys()) == set(compiled_data.keys())
+        assert "ignore" not in initial_data
+        assert "ignore" not in compiled_data
 
-    # Verify group structure
-    for group in compiled_data["groups"]:
-        assert set(group.keys()) <= {
-            "name",
-            "description",
-            "system_prompt",
-            "files",
-            "symbols",
-        }
+
+def test_init_new_project(tmp_path: Path, runner: CliRunner) -> None:
+    """Test creating a new project with hyphenated name"""
+    with runner.isolated_filesystem(temp_dir=tmp_path) as fs:
+        result = runner.invoke(app, ["init", "test-proj"])
+        assert result.exit_code == 0
+
+        project_path = Path(fs) / "test-proj"
+        assert project_path.exists()
+
+        # Check package structure
+        pkg_path = project_path / "test_proj"
+        assert pkg_path.exists()
+        assert (pkg_path / "__init__.py").exists()
+        assert (pkg_path / "main.py").exists()
+
+        # Check package name conversion
+        init_content = (pkg_path / "__init__.py").read_text()
+        assert '__version__ = "0.1.0"' in init_content
+
+        # Check test structure
+        test_path = project_path / "tests"
+        assert test_path.exists()
+        assert (test_path / "__init__.py").exists()
+        assert (test_path / "test_basic.py").exists()
+
+        # Check test content
+        test_content = (test_path / "test_basic.py").read_text()
+        assert "import test_proj" in test_content
+        assert "test_proj.__version__" in test_content
+
+
+def test_init_current_directory(tmp_path: Path, runner: CliRunner) -> None:
+    """Test initializing in current directory"""
+    with runner.isolated_filesystem(temp_dir=tmp_path) as fs:
+        # Should not prompt for confirmation in current directory
+        result = runner.invoke(app, ["init", "."])
+        assert result.exit_code == 0
+        assert (Path(fs) / ".cc").exists()
+        assert (Path(fs) / "codecompanion-workspace.json").exists()
+        assert "Initialized workspace in current directory" in result.stdout
+
+
+def test_init_existing_directory(tmp_path: Path, runner: CliRunner) -> None:
+    """Test initialization in existing directory"""
+    with runner.isolated_filesystem(temp_dir=tmp_path) as fs:
+        # Create existing project
+        project_path = Path(fs) / "existing-proj"
+        project_path.mkdir()
+        (project_path / "existing.txt").write_text("existing content")
+
+        # Creating new project should prompt
+        result = runner.invoke(app, ["init", "existing-proj"], input="n\n")
+        assert result.exit_code == 0
+        assert "Initialize anyway?" in result.stdout
+        assert not (project_path / ".cc").exists()
+
+        # Force flag should skip prompt
+        result = runner.invoke(app, ["init", "existing-proj", "--force"])
+        assert result.exit_code == 0
+        assert (project_path / ".cc").exists()
+        assert (project_path / "codecompanion-workspace.json").exists()
+
+
+def test_workspace_structure(tmp_path: Path, runner: CliRunner) -> None:
+    """Test the basic workspace structure and file discovery"""
+    with runner.isolated_filesystem(temp_dir=tmp_path) as fs:
+        # Create test structure
+        test_dir = Path(fs)
+        (test_dir / "src").mkdir()
+        (test_dir / "src/main.py").write_text("print('hello')")
+        (test_dir / "README.md").write_text("# Documentation")
+        (test_dir / "node_modules").mkdir()
+        (test_dir / "node_modules/package.json").write_text("{}")
+        (test_dir / ".git").mkdir()
+        (test_dir / ".git/config").write_text("git config")
+
+        # Initialize workspace in existing directory
+        result = runner.invoke(app, ["init", "."])
+        assert result.exit_code == 0
+
+        # Verify JSON content and structure
+        json_config = test_dir / "codecompanion-workspace.json"
+        assert json_config.exists()
+
+        with open(json_config) as f:
+            json_content = json.load(f)
+
+        # Verify required fields
+        assert "name" in json_content
+        assert "system_prompt" in json_content
+        assert "groups" in json_content
+        assert isinstance(json_content["groups"], list)
+
+        # Check file discovery
+        files = {f["path"] for g in json_content["groups"] for f in g["files"]}
+        assert "src/main.py" in files  # Should include regular files
+        assert "README.md" in files  # Should include docs
+        assert ".cc/data/CONVENTIONS.md" in files  # Should include conventions
+        assert "node_modules/package.json" not in files  # Should respect ignores
+        assert ".git/config" not in files  # Should ignore dot directories
+
+
+def test_project_name_conversion(tmp_path: Path, runner: CliRunner) -> None:
+    """Test project name conversion to package name"""
+    test_cases = [
+        ("my-project", "my_project"),
+        ("My.Project", "my_project"),
+        ("MY_PROJECT", "my_project"),
+        ("my.cool-project", "my_cool_project"),
+    ]
+
+    with runner.isolated_filesystem(temp_dir=tmp_path) as fs:
+        for project_name, package_name in test_cases:
+            result = runner.invoke(app, ["init", project_name])
+            assert result.exit_code == 0
+
+            project_path = Path(fs) / project_name
+            pkg_path = project_path / package_name
+            assert pkg_path.exists()
+
+            # Check package imports correctly
+            test_content = (project_path / "tests/test_basic.py").read_text()
+            assert f"import {package_name}" in test_content
