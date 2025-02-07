@@ -66,19 +66,6 @@ ccw compile-config --help
 2. Run `ccw compile-config .cc/codecompanion.yaml` to update
 3. Use the generated `codecompanion-workspace.json` in Neovim
 
-## Development
-
-```bash
-# Install dev dependencies
-uv add --dev git+https://github.com/alexeykarnachev/py-codecompanion-workspace
-
-# Run tests
-pytest
-
-# Run quality checks
-./scripts/quality.sh
-```
-
 ## License
 
 [MIT](LICENSE)
