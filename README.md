@@ -22,14 +22,25 @@ ccw init my-new-project
 
 For any project:
 - `.cc/codecompanion.yaml` - Workspace configuration
-- `.cc/data/` - Project documentation
+- `.cc/data/` - Internal cc files (e.g `CONVENTIONS.md`)
 - `codecompanion-workspace.json` - Compiled configuration
 
 For new Python projects:
-- Basic project structure
-- Tests directory with initial test
-- Type hints and quality checks
-- Version management
+- Basic Python project structure:
+  - Package directory with `__init__.py` and `main.py`
+  - Tests directory with initial test
+  - Scripts directory with quality checks
+- Configuration files:
+  - `pyproject.toml` with modern tools setup
+  - Type hints and quality checks configuration
+  - Version management
+- Documentation:
+  - README.md with quick start guide
+  - CHANGELOG.md following Keep a Changelog format
+  - .gitignore with comprehensive Python patterns
+- Git repository:
+  - Initialized with initial commit
+  - Using your Git configuration
 
 ## Usage
 
@@ -69,4 +80,3 @@ ccw compile-config --help
 ## License
 
 [MIT](LICENSE)
-

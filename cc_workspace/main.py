@@ -2,6 +2,7 @@ import fnmatch
 import importlib.resources
 import json
 import re
+import subprocess
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
@@ -465,10 +466,209 @@ if __name__ == "__main__":
     assert {package_name}.__version__ == "0.1.0"
 """
 
+    CHECK_SCRIPT_CONTENT: ClassVar[
+        str
+    ] = """#!/bin/bash
+set -e
+
+echo "🔍 Running complete verification..."
+
+echo "├─ Running ruff..."
+ruff check \\
+    {package_name}/ \\
+    tests/ \\
+    scripts/ \\
+    --select F,E,W,I,N,UP,B,A,C4,SIM,ERA,PL,RUF \\
+    --fix
+
+echo "├─ Running mypy..."
+mypy --strict --ignore-missing-imports {package_name}/ tests/ scripts/
+
+echo "└─ Running tests..."
+pytest -v tests/
+
+echo "✨ All checks passed!"
+"""
+
+    PYPROJECT_CONTENT: ClassVar[
+        str
+    ] = """[project]
+name = "{package_name}"
+dynamic = ["version"]
+description = "Project description"
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+authors = [
+    {{ name = "Your Name", email = "your.email@example.com" }}
+]
+dependencies = [
+    "pydantic>=2.10.6",
+    "typer>=0.15.1",
+]
+
+[project.urls]
+homepage = "https://github.com/username/{package_name}"
+repository = "https://github.com/username/{package_name}"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "{package_name}/__init__.py"
+
+[tool.hatch.build]
+include = [
+    "{package_name}/**/*.py",
+    "{package_name}/**/*.md",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["{package_name}"]
+
+[project.scripts]
+{package_name} = "{package_name}.main:app"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "asyncio: mark test as async/await test",
+]
+
+[tool.ruff.lint]
+per-file-ignores = {{ "__init__.py" = ["F401"], "tests/*" = ["PLR2004"] }}
+"""
+    README_CONTENT: ClassVar[
+        str
+    ] = """# {package_name}
+
+A Python project created with CodeCompanion ✨
+
+## Quick Start
+
+```bash
+# Install package
+uv add git+https://github.com/username/{package_name}
+
+# Or install in development mode
+uv add --dev .
+```
+
+## License
+
+MIT
+"""
+
+    CHANGELOG_CONTENT: ClassVar[
+        str
+    ] = """# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+## [Unreleased]
+
+### Added
+- Initial project structure
+"""
+
+    GITIGNORE_CONTENT: ClassVar[
+        str
+    ] = """# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.tox/
+.coverage
+.coverage.*
+.cache
+coverage.xml
+*.cover
+.pytest_cache/
+.mypy_cache/
+
+# Project specific
+.cc/
+codecompanion-workspace.json
+"""
+
     def __init__(self, path: Path, project_name: str | None = None) -> None:
         self.base_path = path
         self.project_name = project_name or path.name
         self.package_name = to_package_name(self.project_name)
+
+    def _init_git(self) -> None:
+        """Initialize git repository"""
+        try:
+            # First check if git is available
+            subprocess.run(
+                ["git", "--version"],
+                check=True,
+                capture_output=True,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            console.print(
+                "[yellow]Warning: Git not available, "
+                "skipping repository initialization[/yellow]"
+            )
+            return
+
+        try:
+            subprocess.run(
+                ["git", "init", "--quiet"],
+                cwd=self.base_path,
+                check=True,
+            )
+            # Add initial commit with all scaffolded files
+            subprocess.run(
+                ["git", "add", "."],
+                cwd=self.base_path,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "commit", "--quiet", "-m", "Initial commit ✨"],
+                cwd=self.base_path,
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            console.print(
+                f"[yellow]Warning: Failed to initialize git repository: {e}[/yellow]"
+            )
 
     def create_structure(self) -> None:
         """Create project directory structure"""
@@ -484,6 +684,13 @@ if __name__ == "__main__":
         for d in [pkg_dir, test_dir, script_dir]:
             d.mkdir(parents=True, exist_ok=True)
 
+        # Documentation files
+        (self.base_path / "README.md").write_text(
+            self.README_CONTENT.format(package_name=self.package_name)
+        )
+        (self.base_path / "CHANGELOG.md").write_text(self.CHANGELOG_CONTENT)
+        (self.base_path / ".gitignore").write_text(self.GITIGNORE_CONTENT)
+
         # Basic files
         (pkg_dir / "__init__.py").write_text(self.INIT_CONTENT)
         (pkg_dir / "main.py").write_text(self.MAIN_CONTENT)
@@ -491,6 +698,22 @@ if __name__ == "__main__":
         (test_dir / "test_basic.py").write_text(
             self.TEST_CONTENT.format(package_name=self.package_name)
         )
+
+        # Create check script
+        check_script = script_dir / "ccw_check.sh"
+        check_script.write_text(
+            self.CHECK_SCRIPT_CONTENT.format(package_name=self.package_name)
+        )
+        check_script.chmod(0o755)  # Make executable
+
+        # Create pyproject.toml
+        pyproject = self.base_path / "pyproject.toml"
+        pyproject.write_text(
+            self.PYPROJECT_CONTENT.format(package_name=self.package_name)
+        )
+
+        # Initialize git repository
+        self._init_git()
 
 
 @app.command()
