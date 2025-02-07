@@ -146,6 +146,36 @@ def test_init_new_project_structure(tmp_path: Path, runner: CliRunner) -> None:
         assert '__version__ = "0.1.0"' in init_content
 
 
+def test_dev_tools_installation(tmp_path: Path, runner: CliRunner) -> None:
+    """Test development tools installation during project initialization"""
+    with (
+        runner.isolated_filesystem(temp_dir=tmp_path) as _,
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_run.side_effect = create_mock_subprocess()
+        result = runner.invoke(app, ["init", "test-proj"])
+        assert result.exit_code == 0
+
+        # Check if uv add --dev was called with correct packages
+        uv_calls = [
+            call
+            for call in mock_run.call_args_list
+            if isinstance(call[0][0], list) and call[0][0][0] == "uv"
+        ]
+        assert any(
+            call[0][0][1:3] == ["add", "--dev"] for call in uv_calls
+        ), "uv add --dev command not found"
+
+        # Verify dev dependencies were requested
+        dev_deps_call = next(
+            call for call in uv_calls if call[0][0][1:3] == ["add", "--dev"]
+        )
+        requested_packages = dev_deps_call[0][0][3:]
+        assert any("mypy" in pkg for pkg in requested_packages)
+        assert any("pytest" in pkg for pkg in requested_packages)
+        assert any("ruff" in pkg for pkg in requested_packages)
+
+
 def test_init_new_project_tests(tmp_path: Path, runner: CliRunner) -> None:
     """Test test directory structure and content"""
     with (

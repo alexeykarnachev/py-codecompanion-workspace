@@ -502,10 +502,7 @@ license = "MIT"
 authors = [
     {{ name = "Your Name", email = "your.email@example.com" }}
 ]
-dependencies = [
-    "pydantic>=2.10.6",
-    "typer>=0.15.1",
-]
+dependencies = []
 
 [project.urls]
 homepage = "https://github.com/{git_username}/{package_name}"
@@ -537,8 +534,50 @@ markers = [
     "asyncio: mark test as async/await test",
 ]
 
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+indent-width = 4
+extend-exclude = [".pytest_cache", ".ruff_cache", ".venv", "venv"]
+
 [tool.ruff.lint]
+select = [
+    "F",     # Pyflakes
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "I",     # isort
+    "N",     # pep8-naming
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "A",     # flake8-builtins
+    "C4",    # flake8-comprehensions
+    "SIM",   # flake8-simplify
+    "ERA",   # eradicate
+    "PL",    # pylint
+    "RUF",   # ruff-specific rules
+    "F841",  # unused variables
+]
 per-file-ignores = {{ "__init__.py" = ["F401"], "tests/*" = ["PLR2004"] }}
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+ignore_missing_imports = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+warn_unreachable = true
 """
     README_CONTENT: ClassVar[
         str
@@ -693,6 +732,29 @@ codecompanion-workspace.json
                 f"[yellow]Warning: Failed to initialize git repository: {e}[/yellow]"
             )
 
+    def _install_dev_tools(self) -> None:
+        """Install development tools using uv"""
+        try:
+            subprocess.run(
+                [
+                    "uv",
+                    "add",
+                    "--dev",
+                    "mypy>=1.9.0",
+                    "pytest>=8.1.1",
+                    "pytest-asyncio>=0.23.5.post1",
+                    "pytest-cov>=4.1.0",
+                    "ruff>=0.3.3",
+                    "types-pyyaml>=6.0.12.20240311",
+                ],
+                check=True,
+                cwd=self.base_path,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            console.print(
+                f"[yellow]Warning: Failed to install dev dependencies: {e}[/yellow]"
+            )
+
     def create_structure(self) -> None:
         """Create project directory structure"""
         # Create base dir if doesn't exist
@@ -741,8 +803,8 @@ codecompanion-workspace.json
             )
         )
 
-        # Initialize git repository
         self._init_git()
+        self._install_dev_tools()
 
 
 @app.command()
