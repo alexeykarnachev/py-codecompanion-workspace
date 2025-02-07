@@ -4,16 +4,18 @@ A CLI tool to generate workspace files for [CodeCompanion.nvim](https://github.c
 
 ## Quick Start
 
-### Initialize in Existing Project
+### Global Installation
+```bash
+uv pip install --system git+https://github.com/alexeykarnachev/py-codecompanion-workspace
+```
 
+### Initialize in Existing Project
 ```bash
 cd my-project
-uv add git+https://github.com/alexeykarnachev/py-codecompanion-workspace
 ccw init .
 ```
 
 ### Create New Python Project
-
 ```bash
 ccw init my-new-project
 ```
